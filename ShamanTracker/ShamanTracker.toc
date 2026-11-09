@@ -7,6 +7,7 @@
 
 # Core/: game logic. Talks to the game only through the game layer; loaded by the tests.
 Core/GameEvents.lua
+Core/ImbueReminder.lua
 Core/Addon.lua
 
 # Real game layer and bootstrap. The only code that touches the WoW API.
