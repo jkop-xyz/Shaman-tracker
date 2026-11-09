@@ -123,6 +123,24 @@ function ns.CreateRealGame()
     Settings.OpenToCategory(category:GetID())
   end
 
+  -- slider = { id, label, tooltip, min, max, step, default, get = fn, set = fn }
+  function game:AddSlider(category, slider)
+    local variable = "ShamanTracker_" .. slider.id
+    local setting
+    if Settings.RegisterProxySetting then
+      setting = Settings.RegisterProxySetting(category, variable, Settings.VarType.Number,
+        slider.label, slider.default, slider.get, slider.set)
+    else
+      local store = { value = slider.get() }
+      setting = Settings.RegisterAddOnSetting(category, variable, "value", store,
+        Settings.VarType.Number, slider.label, slider.default)
+      Settings.SetOnValueChangedCallback(variable, function(_, _, value) slider.set(value) end)
+    end
+    local options = Settings.CreateSliderOptions(slider.min, slider.max, slider.step)
+    options:SetLabelFormatter(MinimalSliderWithSteppersMixin.Label.Right)
+    Settings.CreateSlider(category, setting, options, slider.tooltip)
+  end
+
   -- A display-only icon. Clicks pass through it.
   function game:CreateIcon(name)
     local iconFrame = CreateFrame("Frame", "ShamanTracker" .. name, UIParent)
@@ -132,10 +150,28 @@ function ns.CreateRealGame()
     iconFrame:Hide()
     local texture = iconFrame:CreateTexture(nil, "ARTWORK")
     texture:SetAllPoints()
+    local text = iconFrame:CreateFontString(nil, "OVERLAY", "NumberFontNormal")
+    text:SetPoint("TOP", iconFrame, "BOTTOM", 0, -2)
+
+    local pulse = iconFrame:CreateAnimationGroup()
+    pulse:SetLooping("BOUNCE")
+    local fade = pulse:CreateAnimation("Alpha")
+    fade:SetFromAlpha(1)
+    fade:SetToAlpha(0.35)
+    fade:SetDuration(0.6)
 
     local icon = { clickable = false }
     function icon:SetTexture(fileID) texture:SetTexture(fileID) end
     function icon:SetTint(r, g, b) texture:SetVertexColor(r, g, b) end
+    function icon:SetText(value) text:SetText(value) end
+    function icon:SetPulsing(pulsing)
+      if pulsing and not pulse:IsPlaying() then
+        pulse:Play()
+      elseif not pulsing and pulse:IsPlaying() then
+        pulse:Stop()
+        iconFrame:SetAlpha(1)
+      end
+    end
     function icon:Show() iconFrame:Show() end
     function icon:Hide() iconFrame:Hide() end
     return icon

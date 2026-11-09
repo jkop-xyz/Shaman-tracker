@@ -27,7 +27,7 @@ function Addon.Start(game, db)
   game:RegisterSlashCommand(SLASH_ALIASES, function(msg)
     Addon.HandleSlash(addon, msg)
   end)
-  addon.imbueReminder = ns.ImbueReminder.Start(game)
+  addon.imbueReminder = ns.ImbueReminder.Start(game, db, addon.settingsCategory)
   return addon
 end
 

@@ -30,6 +30,8 @@ FakeIcon.__index = FakeIcon
 
 function FakeIcon:SetTexture(fileID) self.texture = fileID end
 function FakeIcon:SetTint(r, g, b) self.tint = { r, g, b } end
+function FakeIcon:SetText(text) self.text = text end
+function FakeIcon:SetPulsing(pulsing) self.pulsing = pulsing end
 function FakeIcon:Show() self.shown = true end
 function FakeIcon:Hide() self.shown = false end
 
@@ -57,8 +59,13 @@ function FakeGame:RegisterSlashCommand(aliases, handler)
   self.slashCommand = { aliases = aliases, handler = handler }
 end
 
+-- slider = { id, label, tooltip, min, max, step, default, get = fn, set = fn }
+function FakeGame:AddSlider(category, slider)
+  table.insert(category.settings, slider)
+end
+
 function FakeGame:CreateSettingsCategory(name)
-  local category = { name = name }
+  local category = { name = name, settings = {} }
   table.insert(self.settingsCategories, category)
   return category
 end
@@ -99,6 +106,20 @@ function FakeGame:Fire(name, ...)
   for _, handler in ipairs(self.handlers[name] or {}) do
     handler(...)
   end
+end
+
+function FakeGame:FindSetting(id)
+  for _, category in ipairs(self.settingsCategories) do
+    for _, setting in ipairs(category.settings) do
+      if setting.id == id then return setting end
+    end
+  end
+  error("no setting with id " .. id)
+end
+
+-- Changes a setting the way the player would in the settings panel.
+function FakeGame:ChangeSetting(id, value)
+  self:FindSetting(id).set(value)
 end
 
 -- Runs a slash command the way the player would type it, e.g. "/st settings".

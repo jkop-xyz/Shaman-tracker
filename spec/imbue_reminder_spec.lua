@@ -19,8 +19,8 @@ describe("Imbue Reminder", function()
     game.mainHandEnchants = {}
   end)
 
-  local function start()
-    ns.Addon.Start(game, {})
+  local function start(db)
+    ns.Addon.Start(game, db or {})
     return game.icons.ImbueReminder
   end
 
@@ -111,6 +111,96 @@ describe("Imbue Reminder", function()
       game.knownSpells[ROCKBITER_RANK_1] = true
       game:Fire("spellsChanged")
       assertMissing(icon)
+    end)
+  end)
+
+  describe("Expiring", function()
+    local MINUTE = 60 * 1000
+
+    local function imbueWith(timeLeft)
+      return { hasEnchant = true, enchantType = 3, timeLeft = timeLeft, iconID = 136086 }
+    end
+
+    local function assertExpiring(icon, text)
+      assert.is_true(icon.shown)
+      assert.are.equal(136086, icon.texture)
+      assert.are.same(ns.ImbueReminder.NO_TINT, icon.tint)
+      assert.is_true(icon.pulsing)
+      assert.are.equal(text, icon.text)
+    end
+
+    it("shows the Imbue's icon, pulsing, with time left, below the 5-minute default", function()
+      game.mainHandEnchants = { imbueWith(4 * MINUTE) }
+      assertExpiring(start(), "4:00")
+    end)
+
+    it("hides at exactly the threshold", function()
+      game.mainHandEnchants = { imbueWith(5 * MINUTE) }
+      assert.is_false(start().shown)
+    end)
+
+    it("shows one millisecond below the threshold", function()
+      game.mainHandEnchants = { imbueWith(5 * MINUTE - 1) }
+      assertExpiring(start(), "5:00")
+    end)
+
+    it("counts down", function()
+      game.mainHandEnchants = { imbueWith(4 * MINUTE) }
+      local icon = start()
+      game.mainHandEnchants = { imbueWith(65 * 1000) }
+      game:Fire("tick")
+      assertExpiring(icon, "1:05")
+      game.mainHandEnchants = { imbueWith(9 * 1000 + 1) }
+      game:Fire("tick")
+      assertExpiring(icon, "0:10")
+    end)
+
+    it("switches to Missing when the Imbue falls off", function()
+      game.mainHandEnchants = { imbueWith(2000) }
+      local icon = start()
+      game.mainHandEnchants = {}
+      game:Fire("tick")
+      assertMissing(icon)
+      assert.is_false(icon.pulsing)
+      assert.are.equal("", icon.text)
+    end)
+
+    it("stops pulsing when the Imbue is reapplied", function()
+      game.mainHandEnchants = { imbueWith(MINUTE) }
+      local icon = start()
+      game.mainHandEnchants = { imbueWith(60 * MINUTE) }
+      game:Fire("weaponChanged")
+      assert.is_false(icon.shown)
+      assert.is_false(icon.pulsing)
+    end)
+
+    describe("threshold setting", function()
+      it("is in the settings panel, from 1 to 60 minutes, defaulting to 5", function()
+        start()
+        local slider = game:FindSetting("imbueExpiringThreshold")
+        assert.are.equal(1, slider.min)
+        assert.are.equal(60, slider.max)
+        assert.are.equal(5, slider.default)
+        assert.are.equal(5, slider.get())
+      end)
+
+      it("changes when Expiring starts, and is saved per character", function()
+        local db = {}
+        game.mainHandEnchants = { imbueWith(8 * MINUTE) }
+        ns.Addon.Start(game, db)
+        local icon = game.icons.ImbueReminder
+        assert.is_false(icon.shown)
+
+        game:ChangeSetting("imbueExpiringThreshold", 10)
+        assertExpiring(icon, "8:00")
+        assert.are.equal(10, db.imbueReminder.expiringThresholdMinutes)
+      end)
+
+      it("loads a saved threshold", function()
+        game.mainHandEnchants = { imbueWith(8 * MINUTE) }
+        ns.Addon.Start(game, { imbueReminder = { expiringThresholdMinutes = 10 } })
+        assertExpiring(game.icons.ImbueReminder, "8:00")
+      end)
     end)
   end)
 
