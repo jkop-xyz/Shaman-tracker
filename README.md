@@ -4,7 +4,20 @@ A World of Warcraft: Forever addon for Shamans. It has two Features: an **Imbue 
 
 ## Install
 
-Copy the `ShamanTracker` folder into your WoW: Forever `Interface/AddOns/` folder. On a Shaman, type `/st` for commands. On other classes the addon stays inactive.
+Copy the `ShamanTracker` folder into your WoW: Forever `Interface/AddOns/` folder. After adding or updating files, restart the game client; `/reload` doesn't pick up new files. On other classes the addon stays inactive.
+
+## Using it
+
+- **Imbue Reminder:** an icon appears when your main-hand weapon has no Shaman Imbue (your weapon's icon, tinted red). It also appears when the Imbue is about to run out (the Imbue's icon, pulsing, with a countdown).
+- **Totem Bar:** one button per Element (Earth, Fire, Water, Air).
+  - **Left-click** places the Chosen Totem. **Right-click** picks a different one.
+  - A **badge with a countdown** shows the totem that's actually up.
+  - **The set name under the bar** opens the Totem Set menu: switch, new, rename, delete.
+  - **Changes made in combat** are marked with a gold dot and applied when combat ends.
+- **Totem Macros:** `ST Earth`, `ST Fire`, `ST Water`, `ST Air` and `ST All` (places every Chosen Totem, one per press) are kept up to date for your own action bars and keybinds. Don't edit them; they get overwritten.
+- **Commands:**
+  - `/st settings`: show or hide each Feature, set its size, lock it, make the Totem Bar vertical, and set the Imbue warning time.
+  - `/st unlock` and `/st lock`: drag the Features around, then fix them in place.
 
 ## Development
 

@@ -92,13 +92,20 @@ local function render(icon, state)
   end
 end
 
--- db: the per-character saved data; settingsCategory: where the threshold slider goes.
-function ImbueReminder.Start(game, db, settingsCategory)
+-- db: the per-character saved data; settingsCategory: where its settings go.
+function ImbueReminder.Start(game, db, settingsCategory, gate)
   db.imbueReminder = db.imbueReminder or {}
   local saved = db.imbueReminder
   saved.expiringThresholdMinutes = saved.expiringThresholdMinutes or THRESHOLD_SETTING.default
 
   local icon = game:CreateIcon("ImbueReminder")
+  local frame = ns.FeatureFrame.Attach(game, gate, db, settingsCategory, {
+    key = "imbueReminder",
+    label = "Imbue Reminder",
+    frame = icon,
+    defaultLayout = { point = "CENTER", relativePoint = "CENTER", x = 0, y = -150 },
+  })
+  frame.apply()
   local function update()
     render(icon, ImbueReminder.Evaluate(game, saved.expiringThresholdMinutes))
   end
@@ -116,5 +123,5 @@ function ImbueReminder.Start(game, db, settingsCategory)
     game:On(event, update)
   end
   update()
-  return { icon = icon, update = update }
+  return { icon = icon, update = update, frame = frame }
 end

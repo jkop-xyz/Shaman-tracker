@@ -11,6 +11,8 @@ local SLASH_ALIASES = { "/st", "/shamantracker" }
 local USAGE = {
   "Commands:",
   "/st settings - open the settings panel",
+  "/st unlock - unlock every Feature so you can drag it",
+  "/st lock - lock every Feature in place",
 }
 
 -- Returns the running addon. On a non-Shaman character it stays inactive:
@@ -27,11 +29,13 @@ function Addon.Start(game, db)
   game:RegisterSlashCommand(SLASH_ALIASES, function(msg)
     Addon.HandleSlash(addon, msg)
   end)
-  addon.imbueReminder = ns.ImbueReminder.Start(game, db, addon.settingsCategory)
   addon.gate = ns.CombatGate.New(game)
-  addon.totemBar = ns.TotemBar.Start(game, db, addon.gate)
-  addon.totemMacros = ns.TotemMacros.Start(game, addon.gate, db.totemSets)
+  addon.imbueReminder = ns.ImbueReminder.Start(game, db, addon.settingsCategory, addon.gate)
+  addon.totemBar = ns.TotemBar.Start(game, db, addon.gate, addon.settingsCategory)
+  addon.totemMacros = ns.TotemMacros.Start(game, addon.gate, db.totemSets, addon.totemBar.isEnabled)
   addon.totemBar.onApplied = addon.totemMacros.sync
+  addon.totemBar.onEnabledChanged = addon.totemMacros.sync
+  addon.featureFrames = { addon.imbueReminder.frame, addon.totemBar.frame }
   return addon
 end
 
@@ -39,6 +43,12 @@ function Addon.HandleSlash(addon, msg)
   local command = ((msg or ""):match("^%s*(%S*)") or ""):lower()
   if command == "settings" then
     addon.game:OpenSettings(addon.settingsCategory)
+    return
+  end
+  if command == "lock" or command == "unlock" then
+    for _, frame in ipairs(addon.featureFrames) do
+      frame.setLocked(command == "lock")
+    end
     return
   end
   for _, line in ipairs(USAGE) do

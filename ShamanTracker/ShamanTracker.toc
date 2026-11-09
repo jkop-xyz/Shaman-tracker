@@ -10,6 +10,7 @@ Core/GameEvents.lua
 Core/CombatGate.lua
 Core/Elements.lua
 Core/TotemSets.lua
+Core/FeatureFrame.lua
 Core/ImbueReminder.lua
 Core/TotemBar.lua
 Core/TotemMacros.lua

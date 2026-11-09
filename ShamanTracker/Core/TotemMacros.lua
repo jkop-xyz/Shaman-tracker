@@ -55,12 +55,14 @@ local function trimmed(body)
 end
 
 -- data: the saved Totem Sets (what the buttons place).
-function TotemMacros.Start(game, gate, data)
+-- isEnabled: fn; while it returns false (Totem Bar switched off) the macros are left alone.
+function TotemMacros.Start(game, gate, data, isEnabled)
   local warnedFull = false
   local syncing = false
 
   local function sync()
     if syncing then return end -- our own writes fire macrosChanged
+    if not isEnabled() then return end
     syncing = true
     local bodies = TotemMacros.Bodies(data)
     local full = false
