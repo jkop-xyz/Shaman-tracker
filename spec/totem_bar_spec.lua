@@ -112,6 +112,87 @@ describe("Totem Bar", function()
     end)
   end)
 
+  describe("in combat", function()
+    local bar
+
+    -- Out of combat, Fire is set to Searing; then a fight starts.
+    before_each(function()
+      bar = start()
+      bar.buttons.fire:RightClick()
+      game:ChooseMenuItem("Searing Totem")
+      game:Fire("combatStarted")
+    end)
+
+    local function pick(elementKey, totemName)
+      bar.buttons[elementKey]:RightClick()
+      game:ChooseMenuItem(totemName)
+    end
+
+    it("turns a pick into a Pending Choice: the button keeps placing the old totem", function()
+      pick("fire", "Magma Totem")
+      assert.are.equal("Searing Totem", bar.buttons.fire.spell)
+      assert.are.equal(101, bar.buttons.fire.icon)
+      assert.is_true(bar.buttons.fire.pendingMarker)
+      bar.buttons.fire:LeftClick()
+      assert.are.same({ "Searing Totem" }, game.casts)
+    end)
+
+    it("doesn't change the saved Totem Set until combat ends", function()
+      pick("fire", "Magma Totem")
+      assert.are.equal("Searing Totem", db.totemSets.sets[1].totems.fire)
+    end)
+
+    it("marks the pending pick in the totem list", function()
+      pick("fire", "Magma Totem")
+      bar.buttons.fire:RightClick()
+      assert.is_true(game:FindMenuItem("Magma Totem").checked)
+      assert.is_false(game:FindMenuItem("Searing Totem").checked)
+    end)
+
+    it("leaves other Elements unmarked", function()
+      pick("fire", "Magma Totem")
+      assert.is_falsy(bar.buttons.earth.pendingMarker)
+    end)
+
+    it("applies the latest pick when combat ends", function()
+      pick("fire", "Magma Totem")
+      pick("fire", "None")
+      pick("fire", "Magma Totem")
+      game:Fire("combatEnded")
+      assert.are.equal("Magma Totem", bar.buttons.fire.spell)
+      assert.are.equal(102, bar.buttons.fire.icon)
+      assert.are.equal("Magma Totem", db.totemSets.sets[1].totems.fire)
+    end)
+
+    it("applies all Pending Choices together and clears the markers when combat ends", function()
+      pick("fire", "None")
+      pick("earth", "Stoneskin Totem")
+      game:Fire("combatEnded")
+      assert.is_nil(bar.buttons.fire.spell)
+      assert.are.equal("Stoneskin Totem", bar.buttons.earth.spell)
+      assert.is_false(bar.buttons.fire.pendingMarker)
+      assert.is_false(bar.buttons.earth.pendingMarker)
+    end)
+
+    it("drops the marker when the pick goes back to the current totem", function()
+      pick("fire", "Magma Totem")
+      pick("fire", "Searing Totem")
+      assert.is_false(bar.buttons.fire.pendingMarker)
+    end)
+
+    it("copes with learning a spell mid-fight", function()
+      game:Fire("spellsChanged")
+      assert.are.equal("Searing Totem", bar.buttons.fire.spell)
+    end)
+
+    it("applies picks immediately again once combat is over", function()
+      game:Fire("combatEnded")
+      pick("fire", "Magma Totem")
+      assert.are.equal("Magma Totem", bar.buttons.fire.spell)
+      assert.is_false(bar.buttons.fire.pendingMarker)
+    end)
+  end)
+
   describe("after a reload", function()
     it("restores the Chosen Totems", function()
       db = { totemSets = { active = "Default", sets = {
@@ -122,6 +203,18 @@ describe("Totem Bar", function()
       assert.are.equal(202, bar.buttons.earth.icon)
       assert.are.equal("Healing Stream Totem", bar.buttons.water.spell)
       assert.is_nil(bar.buttons.fire.spell)
+    end)
+
+    it("sets up the buttons once combat ends when reloaded mid-fight", function()
+      db = { totemSets = { active = "Default", sets = {
+        { name = "Default", totems = { fire = "Searing Totem" } },
+      } } }
+      game.inCombat = true
+      local bar = start()
+      assert.is_nil(bar.buttons.fire.spell)
+      assert.are.equal(101, bar.buttons.fire.icon)
+      game:Fire("combatEnded")
+      assert.are.equal("Searing Totem", bar.buttons.fire.spell)
     end)
 
     it("still shows a Chosen Totem the player no longer knows", function()
