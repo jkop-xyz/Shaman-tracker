@@ -132,7 +132,33 @@ end
 -- Totem Bar: a row of secure buttons, one per Element.
 ---------------------------------------------------------------------------
 
-local function createTotemButton(bar, elementKey, index)
+-- Out of combat only: hovering a totem button shows the totem's tooltip.
+local RIGHT_CLICK_HINT = "Right-click to choose a different totem."
+local tooltipOwners = {}
+
+local function showTotemTooltip(frame, elementName)
+  if InCombatLockdown() then return end
+  GameTooltip:SetOwner(frame, "ANCHOR_RIGHT")
+  local spell = frame:GetAttribute("spell")
+  local info = spell and C_Spell.GetSpellInfo(spell)
+  if info then
+    GameTooltip:SetSpellByID(info.spellID)
+  else
+    GameTooltip:SetText(elementName)
+    GameTooltip:AddLine("No totem chosen.", 1, 1, 1)
+  end
+  GameTooltip:AddLine(RIGHT_CLICK_HINT, 0.5, 0.8, 1)
+  GameTooltip:Show()
+end
+
+-- A tooltip that's open when combat starts is closed.
+local combatWatcher = CreateFrame("Frame")
+combatWatcher:RegisterEvent("PLAYER_REGEN_DISABLED")
+combatWatcher:SetScript("OnEvent", function()
+  if tooltipOwners[GameTooltip:GetOwner()] then GameTooltip:Hide() end
+end)
+
+local function createTotemButton(bar, elementKey, elementName, index)
   local frame = CreateFrame("Button", "ShamanTrackerTotemButton" .. index, bar.frame,
     "SecureActionButtonTemplate")
   frame:SetSize(BUTTON_SIZE, BUTTON_SIZE)
@@ -188,6 +214,12 @@ local function createTotemButton(bar, elementKey, index)
     badgeFrame:Hide()
     cooldown:Clear()
   end
+
+  tooltipOwners[frame] = true
+  frame:SetScript("OnEnter", function() showTotemTooltip(frame, elementName) end)
+  frame:SetScript("OnLeave", function()
+    if GameTooltip:GetOwner() == frame then GameTooltip:Hide() end
+  end)
 
   frame:HookScript("OnClick", function(_, mouseButton, down)
     if mouseButton == "RightButton" and not down and rightClickHandler then
@@ -261,8 +293,8 @@ function Widgets.CreateTotemBar(name)
     return setButton
   end
 
-  function bar:CreateButton(elementKey)
-    local button = createTotemButton(bar, elementKey, #bar.buttons + 1)
+  function bar:CreateButton(elementKey, elementName)
+    local button = createTotemButton(bar, elementKey, elementName, #bar.buttons + 1)
     table.insert(bar.buttons, button)
     layout()
     return button
