@@ -35,7 +35,7 @@ _Avoid_: Low, about to fall off
 ### Totems
 
 **Element**:
-One of the four totem categories (Earth, Fire, Water, Air). The player can have at most one totem per Element placed at a time.
+One of the four totem categories (Earth, Air, Water, Fire). The player can have at most one totem per Element placed at a time.
 _Avoid_: School, slot type
 
 **Chosen Totem**:

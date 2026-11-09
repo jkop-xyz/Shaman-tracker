@@ -40,9 +40,11 @@ describe("Totem Bar", function()
       assert.are.equal("Default", db.totemSets.sets[1].name)
     end)
 
-    it("shows one empty button per Element, in the order Earth, Fire, Water, Air", function()
+    it("shows one empty button per Element, in the order Earth, Air, Water, Fire", function()
       local bar = start()
-      assert.are.same({ "earth", "fire", "water", "air" }, bar.order)
+      assert.are.same({ "earth", "air", "water", "fire" }, bar.order)
+      assert.are.equal("Earth", bar.buttons.earth.elementName)
+      assert.are.equal("Fire", bar.buttons.fire.elementName)
       for _, key in ipairs(bar.order) do
         assert.is_nil(bar.buttons[key].spell)
         assert.is_nil(bar.buttons[key].icon)

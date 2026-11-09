@@ -135,8 +135,9 @@ function FakeTotemBar:CreateSetButton()
   return self.setButton
 end
 
-function FakeTotemBar:CreateButton(elementKey)
-  local button = setmetatable({ game = self.game, element = elementKey }, FakeTotemButton)
+function FakeTotemBar:CreateButton(elementKey, elementName)
+  local button = setmetatable({ game = self.game, element = elementKey, elementName = elementName },
+    FakeTotemButton)
   self.buttons[elementKey] = button
   table.insert(self.order, elementKey)
   return button

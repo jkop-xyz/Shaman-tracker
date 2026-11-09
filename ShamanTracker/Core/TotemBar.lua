@@ -220,7 +220,7 @@ function TotemBar.Start(game, db, gate, settingsCategory)
   setButton:OnClick(openSetMenu)
 
   for _, element in ipairs(ns.Elements) do
-    local button = bar:CreateButton(element.key)
+    local button = bar:CreateButton(element.key, element.name)
     button:OnRightClick(function() openTotemMenu(element) end)
     buttons[element.key] = button
   end

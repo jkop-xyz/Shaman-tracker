@@ -9,7 +9,7 @@ Download the zip from the [latest release](https://github.com/jkop-xyz/Shaman-tr
 ## Using it
 
 - **Imbue Reminder:** an icon appears when your main-hand weapon has no Shaman Imbue (your weapon's icon, tinted red). It also appears when the Imbue is about to run out (the Imbue's icon, pulsing, with a countdown).
-- **Totem Bar:** one button per Element (Earth, Fire, Water, Air).
+- **Totem Bar:** one button per Element (Earth, Air, Water, Fire).
   - **Left-click** places the Chosen Totem. **Right-click** picks a different one.
   - A **badge with a countdown** shows the totem that's actually up.
   - **The set name under the bar** opens the Totem Set menu: switch, new, rename, delete.

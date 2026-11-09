@@ -45,11 +45,11 @@ describe("Totem Macros", function()
       assert.are.equal(EMPTY_BODY, game.macros["ST Air"])
     end)
 
-    it("creates a Drop-All Macro placing every Chosen Totem in Earth, Fire, Water, Air order", function()
+    it("creates a Drop-All Macro placing every Chosen Totem in Earth, Air, Water, Fire order", function()
       db.totemSets.sets[1].totems.air = "Grace of Air Totem"
       start()
       assert.are.equal(
-        "#showtooltip\n/castsequence reset=combat/5 Stoneskin Totem, Searing Totem, Grace of Air Totem",
+        "#showtooltip\n/castsequence reset=combat/5 Stoneskin Totem, Grace of Air Totem, Searing Totem",
         game.macros["ST All"])
     end)
 
@@ -92,7 +92,7 @@ describe("Totem Macros", function()
       assert.are.equal("#showtooltip\n/cast Magma Totem", game.macros["ST Fire"])
       assert.are.equal("#showtooltip\n/cast Healing Stream Totem", game.macros["ST Water"])
       assert.are.equal(
-        "#showtooltip\n/castsequence reset=combat/5 Stoneskin Totem, Magma Totem, Healing Stream Totem",
+        "#showtooltip\n/castsequence reset=combat/5 Stoneskin Totem, Healing Stream Totem, Magma Totem",
         game.macros["ST All"])
     end)
 
