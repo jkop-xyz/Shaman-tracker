@@ -4,6 +4,10 @@ local _, ns = ...
 
 local MAIN_HAND_SLOT = 16
 local TICK_SECONDS = 1
+-- Character macros come after the account macros (index 121 on, Phase 0).
+local ACCOUNT_MACRO_SLOTS = 120
+-- With #showtooltip, the macro shows the spell's own icon.
+local MACRO_ICON = "INV_MISC_QUESTIONMARK"
 
 -- Each game event, and the WoW events behind it. Entries with a unit are unit events.
 local WOW_EVENTS = {
@@ -16,6 +20,7 @@ local WOW_EVENTS = {
   },
   spellsChanged = { { "SPELLS_CHANGED" }, { "LEARNED_SPELL_IN_SKILL_LINE" } },
   lifeChanged = { { "PLAYER_DEAD" }, { "PLAYER_ALIVE" }, { "PLAYER_UNGHOST" } },
+  macrosChanged = { { "UPDATE_MACROS" } },
 }
 
 function ns.CreateRealGame()
@@ -137,6 +142,33 @@ function ns.CreateRealGame()
     local options = Settings.CreateSliderOptions(slider.min, slider.max, slider.step)
     options:SetLabelFormatter(MinimalSliderWithSteppersMixin.Label.Right)
     Settings.CreateSlider(category, setting, options, slider.tooltip)
+  end
+
+  -- Character macros only. Scanning their slots (not GetMacroIndexByName)
+  -- means an account macro with the same name is never touched.
+  local function characterMacroIndex(name)
+    local _, numCharacter = GetNumMacros()
+    for index = ACCOUNT_MACRO_SLOTS + 1, ACCOUNT_MACRO_SLOTS + numCharacter do
+      if GetMacroInfo(index) == name then return index end
+    end
+    return nil
+  end
+
+  function game:GetMacroBody(name)
+    local index = characterMacroIndex(name)
+    if not index then return nil end
+    local _, _, body = GetMacroInfo(index)
+    return body
+  end
+
+  function game:SetMacro(name, body)
+    local index = characterMacroIndex(name)
+    if index then
+      EditMacro(index, nil, nil, body)
+      return true
+    end
+    local ok, newIndex = pcall(CreateMacro, name, MACRO_ICON, body, true)
+    return ok and type(newIndex) == "number" and newIndex > 0
   end
 
   function game:GetKnownTotems(slot)

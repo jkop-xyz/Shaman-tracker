@@ -19,6 +19,11 @@ function FakeGame.new(ns, options)
     knownSpells = {},       -- [spellID] = true
     mainHandIcon = nil,     -- fileID of the equipped main-hand weapon, nil if none
     mainHandEnchants = {},  -- list of { hasEnchant, enchantType, timeLeft (ms), iconID }
+    macros = {},            -- [macro name] = body
+    macroIsCharacter = {},  -- [macro name] = true for character (not account) macros
+    freeCharacterMacroSlots = 18,
+    macroWrites = 0,
+    macroBodySuffix = "", -- the game may store bodies with trailing whitespace
     knownTotems = {},       -- [totem slot] = list of { name, icon }
     spellIcons = {},        -- [spell name] = fileID, for spells not in knownTotems
     -- What's on screen, by name:
@@ -126,6 +131,25 @@ function FakeGame:GetMainHandEnchants()
   return self.mainHandEnchants
 end
 
+function FakeGame:GetMacroBody(name)
+  return self.macros[name]
+end
+
+-- Creates (as a character macro) or rewrites a macro. Like the game, refuses
+-- in combat. Returns false if a new macro doesn't fit.
+function FakeGame:SetMacro(name, body)
+  assert(not self.inCombat, "blocked: macro changed in combat")
+  if self.macros[name] == nil then
+    if self.freeCharacterMacroSlots <= 0 then return false end
+    self.freeCharacterMacroSlots = self.freeCharacterMacroSlots - 1
+    self.macroIsCharacter[name] = true
+  end
+  self.macros[name] = body .. self.macroBodySuffix
+  self.macroWrites = self.macroWrites + 1
+  self:Fire("macrosChanged")
+  return true
+end
+
 function FakeGame:GetKnownTotems(slot)
   return self.knownTotems[slot] or {}
 end
@@ -191,6 +215,29 @@ end
 -- Changes a setting the way the player would in the settings panel.
 function FakeGame:ChangeSetting(id, value)
   self:FindSetting(id).set(value)
+end
+
+function FakeGame:DeleteMacroByPlayer(name)
+  assert(self.macros[name], "no macro " .. name)
+  self.macros[name] = nil
+  self.macroIsCharacter[name] = nil
+  self.freeCharacterMacroSlots = self.freeCharacterMacroSlots + 1
+  self:Fire("macrosChanged")
+end
+
+function FakeGame:EditMacroByPlayer(name, body)
+  assert(self.macros[name], "no macro " .. name)
+  self.macros[name] = body
+  self:Fire("macrosChanged")
+end
+
+function FakeGame:MacroNamesStartingWith(prefix)
+  local names = {}
+  for name in pairs(self.macros) do
+    if name:sub(1, #prefix) == prefix then table.insert(names, name) end
+  end
+  table.sort(names)
+  return names
 end
 
 -- Runs a slash command the way the player would type it, e.g. "/st settings".
