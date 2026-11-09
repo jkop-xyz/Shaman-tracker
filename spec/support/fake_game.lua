@@ -19,9 +19,45 @@ function FakeGame.new(ns, options)
     knownSpells = {},       -- [spellID] = true
     mainHandIcon = nil,     -- fileID of the equipped main-hand weapon, nil if none
     mainHandEnchants = {},  -- list of { hasEnchant, enchantType, timeLeft (ms), iconID }
+    knownTotems = {},       -- [totem slot] = list of { name, icon }
+    spellIcons = {},        -- [spell name] = fileID, for spells not in knownTotems
     -- What's on screen, by name:
     icons = {},
+    totemBars = {},
+    openMenu = nil,         -- { owner, items } of the last menu shown
+    -- What the player did:
+    casts = {},             -- spell names cast from addon buttons
   }, FakeGame)
+end
+
+-- A fake secure totem button. Like the game, it refuses spell changes in combat.
+local FakeTotemButton = {}
+FakeTotemButton.__index = FakeTotemButton
+
+function FakeTotemButton:SetSpell(spellName)
+  assert(not self.game.inCombat, "blocked: secure button changed in combat")
+  self.spell = spellName
+end
+function FakeTotemButton:SetIcon(fileID) self.icon = fileID end
+function FakeTotemButton:SetPendingMarker(shown) self.pendingMarker = shown end
+function FakeTotemButton:OnRightClick(handler) self.rightClickHandler = handler end
+
+-- Test helpers: click the button the way the player would.
+function FakeTotemButton:LeftClick()
+  if self.spell then table.insert(self.game.casts, self.spell) end
+end
+function FakeTotemButton:RightClick()
+  if self.rightClickHandler then self.rightClickHandler() end
+end
+
+local FakeTotemBar = {}
+FakeTotemBar.__index = FakeTotemBar
+
+function FakeTotemBar:CreateButton(elementKey)
+  local button = setmetatable({ game = self.game, element = elementKey }, FakeTotemButton)
+  self.buttons[elementKey] = button
+  table.insert(self.order, elementKey)
+  return button
 end
 
 -- A fake icon records what it shows, for tests to check.
@@ -88,6 +124,41 @@ end
 
 function FakeGame:GetMainHandEnchants()
   return self.mainHandEnchants
+end
+
+function FakeGame:GetKnownTotems(slot)
+  return self.knownTotems[slot] or {}
+end
+
+function FakeGame:GetSpellIcon(spellName)
+  return self.spellIcons[spellName]
+end
+
+function FakeGame:CreateTotemBar(name)
+  assert(not self.totemBars[name], "totem bar created twice: " .. name)
+  local bar = setmetatable({ game = self, name = name, buttons = {}, order = {} }, FakeTotemBar)
+  self.totemBars[name] = bar
+  return bar
+end
+
+-- items: list of { title = text } | { divider = true } | { text, checked, onSelect }
+function FakeGame:ShowMenu(owner, items)
+  self.openMenu = { owner = owner, items = items }
+end
+
+function FakeGame:FindMenuItem(text)
+  assert(self.openMenu, "no menu open")
+  for _, item in ipairs(self.openMenu.items) do
+    if item.text == text then return item end
+  end
+  error("no menu item " .. text)
+end
+
+-- Picks a menu item the way the player would; the menu closes.
+function FakeGame:ChooseMenuItem(text)
+  local item = self:FindMenuItem(text)
+  self.openMenu = nil
+  item.onSelect()
 end
 
 function FakeGame:CreateIcon(name)
