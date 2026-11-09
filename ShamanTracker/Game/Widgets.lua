@@ -8,6 +8,7 @@ ns.Widgets = Widgets
 local ICON_SIZE = 40
 local BUTTON_SIZE = 36
 local BUTTON_GAP = 4
+local BADGE_SIZE = 16
 local EMPTY_COLOR = { 0, 0, 0, 0.5 }
 
 ---------------------------------------------------------------------------
@@ -77,8 +78,38 @@ local function createTotemButton(bar, elementKey, index)
   marker:SetColorTexture(1, 0.82, 0, 1)
   marker:Hide()
 
+  -- Active Totem: a cooldown swipe with countdown over the button, and a
+  -- small badge with the Active Totem's icon in the bottom-left corner.
+  local cooldown = CreateFrame("Cooldown", nil, frame, "CooldownFrameTemplate")
+  cooldown:SetAllPoints()
+  cooldown:SetDrawEdge(false)
+  cooldown:SetHideCountdownNumbers(false)
+  local badgeFrame = CreateFrame("Frame", nil, frame)
+  badgeFrame:SetFrameLevel(cooldown:GetFrameLevel() + 1)
+  badgeFrame:SetSize(BADGE_SIZE, BADGE_SIZE)
+  badgeFrame:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", -3, -3)
+  local badgeBorder = badgeFrame:CreateTexture(nil, "BACKGROUND")
+  badgeBorder:SetPoint("TOPLEFT", -1, 1)
+  badgeBorder:SetPoint("BOTTOMRIGHT", 1, -1)
+  badgeBorder:SetColorTexture(0, 0, 0, 1)
+  local badge = badgeFrame:CreateTexture(nil, "ARTWORK")
+  badge:SetAllPoints()
+  badgeFrame:Hide()
+
   local button = { frame = frame, element = elementKey }
   local rightClickHandler
+
+  -- totem = { icon, duration } from the game layer; possibly secret values,
+  -- so they go straight into the widgets.
+  function button:ShowActiveTotem(totem)
+    badge:SetTexture(totem.icon)
+    badgeFrame:Show()
+    cooldown:SetCooldownFromDurationObject(totem.duration)
+  end
+  function button:HideActiveTotem()
+    badgeFrame:Hide()
+    cooldown:Clear()
+  end
 
   frame:HookScript("OnClick", function(_, mouseButton, down)
     if mouseButton == "RightButton" and not down and rightClickHandler then

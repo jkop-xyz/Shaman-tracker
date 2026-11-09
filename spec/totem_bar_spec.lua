@@ -234,3 +234,64 @@ describe("Totem Bar", function()
     assert.is_nil(game.totemBars.TotemBar)
   end)
 end)
+
+describe("Active Totem badge", function()
+  local ns, game
+
+  before_each(function()
+    ns = AddonLoader.load()
+    game = FakeGame.new(ns)
+    game.knownTotems = KNOWN
+  end)
+
+  local function start()
+    ns.Addon.Start(game, {})
+    return game.totemBars.TotemBar
+  end
+
+  it("shows the Active Totem's icon and duration while a totem is up", function()
+    local totem = { icon = 202, duration = { remaining = 120 } }
+    game.activeTotems[2] = totem
+    local bar = start()
+    assert.are.equal(totem, bar.buttons.earth.activeTotem)
+    assert.is_nil(bar.buttons.fire.activeTotem)
+  end)
+
+  it("shows it even when it matches the Chosen Totem", function()
+    local bar = start()
+    bar.buttons.fire:RightClick()
+    game:ChooseMenuItem("Searing Totem")
+    local totem = { icon = 101, duration = {} }
+    game.activeTotems[1] = totem
+    game:Fire("totemsChanged")
+    assert.are.equal(totem, bar.buttons.fire.activeTotem)
+  end)
+
+  it("passes secret values straight to the badge in combat", function()
+    local bar = start()
+    game:Fire("combatStarted")
+    local icon, duration = FakeGame.Secret("icon"), FakeGame.Secret("duration")
+    game.activeTotems[1] = { icon = icon, duration = duration }
+    game:Fire("totemsChanged")
+    assert.are.equal(icon, rawget(bar.buttons.fire.activeTotem, "icon"))
+    assert.are.equal(duration, rawget(bar.buttons.fire.activeTotem, "duration"))
+  end)
+
+  it("clears when the totem expires or is destroyed", function()
+    game.activeTotems[3] = { icon = 301, duration = {} }
+    local bar = start()
+    game.activeTotems[3] = nil
+    game:Fire("totemsChanged")
+    assert.is_nil(bar.buttons.water.activeTotem)
+  end)
+
+  it("updates however the totem was placed", function()
+    local bar = start()
+    -- e.g. Call of the Elements, or the player's own keybind
+    game.activeTotems = { [1] = { icon = 101, duration = {} }, [2] = { icon = 201, duration = {} } }
+    game:Fire("totemsChanged")
+    assert.truthy(bar.buttons.fire.activeTotem)
+    assert.truthy(bar.buttons.earth.activeTotem)
+    assert.is_nil(bar.buttons.air.activeTotem)
+  end)
+end)
