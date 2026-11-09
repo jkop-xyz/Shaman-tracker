@@ -28,7 +28,8 @@ function Addon.Start(game, db)
     Addon.HandleSlash(addon, msg)
   end)
   addon.imbueReminder = ns.ImbueReminder.Start(game, db, addon.settingsCategory)
-  addon.totemBar = ns.TotemBar.Start(game, db)
+  addon.gate = ns.CombatGate.New(game)
+  addon.totemBar = ns.TotemBar.Start(game, db, addon.gate)
   return addon
 end
 
