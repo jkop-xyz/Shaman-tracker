@@ -21,6 +21,7 @@ local WOW_EVENTS = {
   spellsChanged = { { "SPELLS_CHANGED" }, { "LEARNED_SPELL_IN_SKILL_LINE" } },
   lifeChanged = { { "PLAYER_DEAD" }, { "PLAYER_ALIVE" }, { "PLAYER_UNGHOST" } },
   macrosChanged = { { "UPDATE_MACROS" } },
+  totemsChanged = { { "PLAYER_TOTEM_UPDATE" } },
 }
 
 function ns.CreateRealGame()
@@ -169,6 +170,16 @@ function ns.CreateRealGame()
     end
     local ok, newIndex = pcall(CreateMacro, name, MACRO_ICON, body, true)
     return ok and type(newIndex) == "number" and newIndex > 0
+  end
+
+  -- nil if the slot is empty. In combat the values are secret: they may only
+  -- be handed to widgets. GetTotemDuration returns nil (not secret) for an
+  -- empty slot; the `haveTotem` flag isn't reliable (Phase 0, issue #9).
+  function game:GetActiveTotem(slot)
+    local duration = GetTotemDuration(slot)
+    if duration == nil then return nil end
+    local _, _, _, _, icon = GetTotemInfo(slot)
+    return { icon = icon, duration = duration }
   end
 
   function game:GetKnownTotems(slot)

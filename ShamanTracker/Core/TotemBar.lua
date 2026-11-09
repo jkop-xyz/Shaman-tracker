@@ -50,6 +50,20 @@ function TotemBar.Start(game, db, gate)
     end
   end
 
+  -- The Active Totem badge. In combat the game keeps totem data secret: it
+  -- can't be compared or calculated with, only handed to widgets. So the
+  -- badge shows whatever is up, without comparing it to the Chosen Totem.
+  local function showActiveTotems()
+    for _, element in ipairs(ns.Elements) do
+      local totem = game:GetActiveTotem(element.slot)
+      if totem then
+        buttons[element.key]:ShowActiveTotem(totem)
+      else
+        buttons[element.key]:HideActiveTotem()
+      end
+    end
+  end
+
   -- Secure: only through the combat gate.
   local function applySpells()
     for _, element in ipairs(ns.Elements) do
@@ -117,8 +131,10 @@ function TotemBar.Start(game, db, gate)
 
   -- Icons can change when the player learns a new rank.
   game:On("spellsChanged", showIcons)
+  game:On("totemsChanged", showActiveTotems)
 
   showIcons()
+  showActiveTotems()
   gate:Run("totemBar", applySpells)
   showMarkers()
   return controller

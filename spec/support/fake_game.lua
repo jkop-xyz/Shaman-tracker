@@ -3,6 +3,26 @@
 local FakeGame = {}
 FakeGame.__index = FakeGame
 
+-- A stand-in for a value the game keeps secret in combat. Like the real thing,
+-- it can be handed to widgets, but comparing it, doing arithmetic with it,
+-- indexing it or turning it into text raises an error.
+function FakeGame.Secret(label)
+  local secret = newproxy(true)
+  local mt = getmetatable(secret)
+  local function refuse() error("secret value used: " .. label, 2) end
+  mt.__index = refuse
+  mt.__lt = refuse
+  mt.__le = refuse
+  mt.__add = refuse
+  mt.__sub = refuse
+  mt.__mul = refuse
+  mt.__div = refuse
+  mt.__concat = refuse
+  mt.__len = refuse
+  mt.__tostring = refuse
+  return secret
+end
+
 function FakeGame.new(ns, options)
   options = options or {}
   return setmetatable({
@@ -25,6 +45,7 @@ function FakeGame.new(ns, options)
     macroWrites = 0,
     macroBodySuffix = "", -- the game may store bodies with trailing whitespace
     knownTotems = {},       -- [totem slot] = list of { name, icon }
+    activeTotems = {},      -- [totem slot] = { icon, duration } (possibly FakeGame.Secret values)
     spellIcons = {},        -- [spell name] = fileID, for spells not in knownTotems
     -- What's on screen, by name:
     icons = {},
@@ -45,6 +66,8 @@ function FakeTotemButton:SetSpell(spellName)
 end
 function FakeTotemButton:SetIcon(fileID) self.icon = fileID end
 function FakeTotemButton:SetPendingMarker(shown) self.pendingMarker = shown end
+function FakeTotemButton:ShowActiveTotem(totem) self.activeTotem = totem end
+function FakeTotemButton:HideActiveTotem() self.activeTotem = nil end
 function FakeTotemButton:OnRightClick(handler) self.rightClickHandler = handler end
 
 -- Test helpers: click the button the way the player would.
@@ -148,6 +171,10 @@ function FakeGame:SetMacro(name, body)
   self.macroWrites = self.macroWrites + 1
   self:Fire("macrosChanged")
   return true
+end
+
+function FakeGame:GetActiveTotem(slot)
+  return self.activeTotems[slot]
 end
 
 function FakeGame:GetKnownTotems(slot)
