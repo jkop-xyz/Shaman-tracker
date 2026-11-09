@@ -198,6 +198,8 @@ function ns.CreateRealGame()
   function game:CreateIcon(name) return ns.Widgets.CreateIcon(name) end
   function game:CreateTotemBar(name) return ns.Widgets.CreateTotemBar(name) end
   function game:ShowMenu(owner, items) ns.Widgets.ShowMenu(owner, items) end
+  function game:PromptText(prompt) ns.Widgets.PromptText(prompt) end
+  function game:Confirm(confirmation) ns.Widgets.Confirm(confirmation) end
 
   return game
 end

@@ -9,6 +9,7 @@ local ICON_SIZE = 40
 local BUTTON_SIZE = 36
 local BUTTON_GAP = 4
 local BADGE_SIZE = 16
+local SET_BUTTON_HEIGHT = 14
 local EMPTY_COLOR = { 0, 0, 0, 0.5 }
 
 ---------------------------------------------------------------------------
@@ -138,6 +139,32 @@ function Widgets.CreateTotemBar(name)
     end
   end
 
+  -- The control for switching Totem Set: the set's name, under the bar.
+  function bar:CreateSetButton()
+    local setFrame = CreateFrame("Button", "ShamanTracker" .. name .. "SetButton", frame)
+    setFrame:SetHeight(SET_BUTTON_HEIGHT)
+    setFrame:SetPoint("TOPLEFT", frame, "BOTTOMLEFT", 0, -2)
+    setFrame:SetPoint("TOPRIGHT", frame, "BOTTOMRIGHT", 0, -2)
+    setFrame:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+    local label = setFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    label:SetPoint("CENTER")
+    local highlight = setFrame:CreateTexture(nil, "HIGHLIGHT")
+    highlight:SetAllPoints()
+    highlight:SetColorTexture(1, 1, 1, 0.1)
+    local marker = setFrame:CreateTexture(nil, "OVERLAY")
+    marker:SetSize(6, 6)
+    marker:SetPoint("LEFT", label, "RIGHT", 3, 0)
+    marker:SetColorTexture(1, 0.82, 0, 1)
+    marker:Hide()
+
+    local setButton = { frame = setFrame }
+    function setButton:SetText(text) label:SetText(text) end
+    function setButton:SetPendingMarker(shown) marker:SetShown(shown and true or false) end
+    function setButton:OnClick(handler) setFrame:SetScript("OnClick", function() handler() end) end
+    bar.setButton = setButton
+    return setButton
+  end
+
   function bar:CreateButton(elementKey)
     local button = createTotemButton(bar, elementKey, #bar.buttons + 1)
     table.insert(bar.buttons, button)
@@ -150,8 +177,8 @@ end
 
 ---------------------------------------------------------------------------
 -- Menus. items: list of { title = text } | { divider = true } |
--- { text, checked, onSelect }. Items with `checked` (true or false) are
--- radio items; items without it are plain buttons.
+-- { text, checked, disabled, onSelect }. Items with `checked` (true or
+-- false) are radio items; items without it are plain buttons.
 ---------------------------------------------------------------------------
 
 function Widgets.ShowMenu(owner, items)
@@ -161,11 +188,69 @@ function Widgets.ShowMenu(owner, items)
         root:CreateTitle(item.title)
       elseif item.divider then
         root:CreateDivider()
-      elseif item.checked ~= nil then
-        root:CreateRadio(item.text, function() return item.checked end, function() item.onSelect() end)
       else
-        root:CreateButton(item.text, function() item.onSelect() end)
+        local description
+        if item.checked ~= nil then
+          description = root:CreateRadio(item.text, function() return item.checked end,
+            function() item.onSelect() end)
+        else
+          description = root:CreateButton(item.text, function() item.onSelect() end)
+        end
+        if item.disabled then description:SetEnabled(false) end
       end
     end
   end)
+end
+
+---------------------------------------------------------------------------
+-- Dialogs: a text prompt and a yes/no confirmation.
+---------------------------------------------------------------------------
+
+local PROMPT = "SHAMANTRACKER_PROMPT"
+local CONFIRM = "SHAMANTRACKER_CONFIRM"
+
+local function acceptPrompt(dialog)
+  local text = dialog:GetEditBox():GetText()
+  dialog.data.onAccept(text)
+end
+
+StaticPopupDialogs[PROMPT] = {
+  text = "%s",
+  button1 = ACCEPT,
+  button2 = CANCEL,
+  hasEditBox = true,
+  OnShow = function(dialog)
+    local editBox = dialog:GetEditBox()
+    editBox:SetText(dialog.data.default or "")
+    editBox:HighlightText()
+  end,
+  OnAccept = acceptPrompt,
+  EditBoxOnEnterPressed = function(editBox, data)
+    data.onAccept(editBox:GetText())
+    StaticPopup_Hide(PROMPT)
+  end,
+  EditBoxOnEscapePressed = function() StaticPopup_Hide(PROMPT) end,
+  timeout = 0,
+  whileDead = true,
+  hideOnEscape = true,
+}
+
+StaticPopupDialogs[CONFIRM] = {
+  text = "%s",
+  button1 = YES,
+  button2 = NO,
+  OnAccept = function(dialog) dialog.data.onAccept() end,
+  timeout = 0,
+  whileDead = true,
+  hideOnEscape = true,
+}
+
+-- prompt = { title, default, onAccept = fn(text) }
+function Widgets.PromptText(prompt)
+  StaticPopup_Show(PROMPT, prompt.title, nil, prompt)
+end
+
+-- confirmation = { text, onAccept = fn() }
+function Widgets.Confirm(confirmation)
+  StaticPopup_Show(CONFIRM, confirmation.text, nil, confirmation)
 end
