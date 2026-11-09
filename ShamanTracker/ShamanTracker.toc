@@ -1,0 +1,14 @@
+## Interface: 16001
+## Title: Shaman-tracker
+## Notes: Imbue Reminder and Totem Bar for Shamans in WoW: Forever.
+## Author: Jakob
+## Version: 0.1.0
+## SavedVariablesPerCharacter: ShamanTrackerDB
+
+# Core/: game logic. Talks to the game only through the game layer; loaded by the tests.
+Core/GameEvents.lua
+Core/Addon.lua
+
+# Real game layer and bootstrap. The only code that touches the WoW API.
+Game/RealGame.lua
+Init.lua
