@@ -23,6 +23,40 @@ function FakeGame.Secret(label)
   return secret
 end
 
+-- Feature frame methods shared by the fake icon and the fake Totem Bar. A
+-- protected frame (one holding secure buttons) refuses changes in combat.
+local FeatureFrameMethods = {}
+
+local function refuseInCombat(frame, what)
+  if frame.protected then
+    assert(not frame.game.inCombat, "blocked: " .. what .. " in combat")
+  end
+end
+
+function FeatureFrameMethods:SetLayout(layout)
+  refuseInCombat(self, "frame moved or scaled")
+  self.layout = { point = layout.point, relativePoint = layout.relativePoint,
+    x = layout.x, y = layout.y, scale = layout.scale }
+end
+function FeatureFrameMethods:SetEnabled(enabled)
+  refuseInCombat(self, "frame shown or hidden")
+  self.enabled = enabled
+end
+function FeatureFrameMethods:SetUnlocked(unlocked) self.unlocked = unlocked end
+function FeatureFrameMethods:OnMoved(handler) self.movedHandler = handler end
+-- Test helper: drags the frame the way the player would.
+function FeatureFrameMethods:DragTo(point, relativePoint, x, y)
+  assert(self.unlocked, "frame is locked")
+  -- Like a real frame, it moves itself; then the game layer reports where to.
+  self.layout = { point = point, relativePoint = relativePoint, x = x, y = y,
+    scale = self.layout and self.layout.scale }
+  self.movedHandler(point, relativePoint, x, y)
+end
+
+local function addFeatureFrameMethods(class)
+  for name, fn in pairs(FeatureFrameMethods) do class[name] = fn end
+end
+
 function FakeGame.new(ns, options)
   options = options or {}
   return setmetatable({
@@ -89,6 +123,12 @@ function FakeSetButton:Click() self.clickHandler() end
 
 local FakeTotemBar = {}
 FakeTotemBar.__index = FakeTotemBar
+addFeatureFrameMethods(FakeTotemBar)
+
+function FakeTotemBar:SetVertical(vertical)
+  refuseInCombat(self, "Totem Bar re-laid out")
+  self.vertical = vertical
+end
 
 function FakeTotemBar:CreateSetButton()
   self.setButton = setmetatable({}, FakeSetButton)
@@ -105,6 +145,7 @@ end
 -- A fake icon records what it shows, for tests to check.
 local FakeIcon = {}
 FakeIcon.__index = FakeIcon
+addFeatureFrameMethods(FakeIcon)
 
 function FakeIcon:SetTexture(fileID) self.texture = fileID end
 function FakeIcon:SetTint(r, g, b) self.tint = { r, g, b } end
@@ -140,6 +181,16 @@ end
 -- slider = { id, label, tooltip, min, max, step, default, get = fn, set = fn }
 function FakeGame:AddSlider(category, slider)
   table.insert(category.settings, slider)
+end
+
+-- checkbox = { id, label, tooltip, default, get = fn, set = fn }
+function FakeGame:AddCheckbox(category, checkbox)
+  table.insert(category.settings, checkbox)
+end
+
+function FakeGame:AddHeader(category, text)
+  category.headers = category.headers or {}
+  table.insert(category.headers, text)
 end
 
 function FakeGame:CreateSettingsCategory(name)
@@ -201,7 +252,8 @@ end
 
 function FakeGame:CreateTotemBar(name)
   assert(not self.totemBars[name], "totem bar created twice: " .. name)
-  local bar = setmetatable({ game = self, name = name, buttons = {}, order = {} }, FakeTotemBar)
+  local bar = setmetatable({ game = self, name = name, buttons = {}, order = {}, protected = true },
+    FakeTotemBar)
   self.totemBars[name] = bar
   return bar
 end
@@ -252,7 +304,7 @@ end
 
 function FakeGame:CreateIcon(name)
   assert(not self.icons[name], "icon created twice: " .. name)
-  local icon = setmetatable({ name = name, shown = false, clickable = false }, FakeIcon)
+  local icon = setmetatable({ game = self, name = name, shown = false, clickable = false }, FakeIcon)
   self.icons[name] = icon
   return icon
 end

@@ -117,10 +117,37 @@ function ns.CreateRealGame()
     SlashCmdList.SHAMANTRACKER = handler
   end
 
+  local settingsLayouts = {} -- [category] = layout
+
   function game:CreateSettingsCategory(name)
-    local category = Settings.RegisterVerticalLayoutCategory(name)
+    local category, layout = Settings.RegisterVerticalLayoutCategory(name)
     Settings.RegisterAddOnCategory(category)
+    settingsLayouts[category] = layout
     return category
+  end
+
+  local function registerSetting(category, control, varType)
+    local variable = "ShamanTracker_" .. control.id
+    if Settings.RegisterProxySetting then
+      return Settings.RegisterProxySetting(category, variable, varType,
+        control.label, control.default, control.get, control.set)
+    end
+    local store = { value = control.get() }
+    local setting = Settings.RegisterAddOnSetting(category, variable, "value", store,
+      varType, control.label, control.default)
+    Settings.SetOnValueChangedCallback(variable, function(_, _, value) control.set(value) end)
+    return setting
+  end
+
+  -- checkbox = { id, label, tooltip, default, get = fn, set = fn }
+  function game:AddCheckbox(category, checkbox)
+    local setting = registerSetting(category, checkbox, Settings.VarType.Boolean)
+    Settings.CreateCheckbox(category, setting, checkbox.tooltip)
+  end
+
+  function game:AddHeader(category, text)
+    local layout = settingsLayouts[category] or SettingsPanel:GetLayout(category)
+    layout:AddInitializer(CreateSettingsListSectionHeaderInitializer(text))
   end
 
   function game:OpenSettings(category)
@@ -129,17 +156,7 @@ function ns.CreateRealGame()
 
   -- slider = { id, label, tooltip, min, max, step, default, get = fn, set = fn }
   function game:AddSlider(category, slider)
-    local variable = "ShamanTracker_" .. slider.id
-    local setting
-    if Settings.RegisterProxySetting then
-      setting = Settings.RegisterProxySetting(category, variable, Settings.VarType.Number,
-        slider.label, slider.default, slider.get, slider.set)
-    else
-      local store = { value = slider.get() }
-      setting = Settings.RegisterAddOnSetting(category, variable, "value", store,
-        Settings.VarType.Number, slider.label, slider.default)
-      Settings.SetOnValueChangedCallback(variable, function(_, _, value) slider.set(value) end)
-    end
+    local setting = registerSetting(category, slider, Settings.VarType.Number)
     local options = Settings.CreateSliderOptions(slider.min, slider.max, slider.step)
     options:SetLabelFormatter(MinimalSliderWithSteppersMixin.Label.Right)
     Settings.CreateSlider(category, setting, options, slider.tooltip)

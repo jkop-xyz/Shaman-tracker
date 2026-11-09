@@ -11,6 +11,62 @@ local BUTTON_GAP = 4
 local BADGE_SIZE = 16
 local SET_BUTTON_HEIGHT = 14
 local EMPTY_COLOR = { 0, 0, 0, 0.5 }
+local SET_BUTTON_WIDTH = 90
+local PLACEHOLDER_ICON = 134400 -- question mark
+
+---------------------------------------------------------------------------
+-- Feature frame behaviour shared by the Imbue Reminder icon and the Totem
+-- Bar: layout, on/off, and an unlocked mode with a drag handle on top (so
+-- dragging never clicks the secure buttons underneath).
+---------------------------------------------------------------------------
+
+local function addFeatureFrame(handle, frame, label, updateVisibility)
+  frame:SetMovable(true)
+  frame:SetClampedToScreen(true)
+
+  local dragHandle = CreateFrame("Frame", nil, frame)
+  dragHandle:SetAllPoints()
+  dragHandle:SetFrameLevel(frame:GetFrameLevel() + 20)
+  dragHandle:EnableMouse(true)
+  dragHandle:RegisterForDrag("LeftButton")
+  local tint = dragHandle:CreateTexture(nil, "OVERLAY")
+  tint:SetAllPoints()
+  tint:SetColorTexture(0, 0.8, 0.2, 0.35)
+  local caption = dragHandle:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+  caption:SetPoint("BOTTOM", dragHandle, "TOP", 0, 2)
+  caption:SetText(label)
+  dragHandle:Hide()
+
+  local movedHandler
+  dragHandle:SetScript("OnDragStart", function()
+    if not InCombatLockdown() then frame:StartMoving() end
+  end)
+  dragHandle:SetScript("OnDragStop", function()
+    frame:StopMovingOrSizing()
+    -- Shaman-tracker saves the position itself, not the game's layout cache.
+    frame:SetUserPlaced(false)
+    local point, _, relativePoint, x, y = frame:GetPoint()
+    if movedHandler then movedHandler(point, relativePoint, x, y) end
+  end)
+
+  handle.enabled = true
+  handle.unlocked = false
+  function handle:SetLayout(layout)
+    frame:ClearAllPoints()
+    frame:SetPoint(layout.point, UIParent, layout.relativePoint, layout.x, layout.y)
+    frame:SetScale(layout.scale)
+  end
+  function handle:SetEnabled(enabled)
+    handle.enabled = enabled
+    updateVisibility()
+  end
+  function handle:SetUnlocked(unlocked)
+    handle.unlocked = unlocked
+    dragHandle:SetShown(unlocked)
+    updateVisibility()
+  end
+  function handle:OnMoved(handler) movedHandler = handler end
+end
 
 ---------------------------------------------------------------------------
 -- Imbue Reminder icon: display-only, clicks pass through.
@@ -24,6 +80,11 @@ function Widgets.CreateIcon(name)
   frame:Hide()
   local texture = frame:CreateTexture(nil, "ARTWORK")
   texture:SetAllPoints()
+  -- Shown while unlocked with nothing to remind about, so there's something to drag.
+  local placeholder = frame:CreateTexture(nil, "ARTWORK")
+  placeholder:SetAllPoints()
+  placeholder:SetTexture(PLACEHOLDER_ICON)
+  placeholder:Hide()
   local text = frame:CreateFontString(nil, "OVERLAY", "NumberFontNormal")
   text:SetPoint("TOP", frame, "BOTTOM", 0, -2)
 
@@ -35,6 +96,16 @@ function Widgets.CreateIcon(name)
   fade:SetDuration(0.6)
 
   local icon = { frame = frame, clickable = false }
+  local contentShown = false
+
+  local function updateVisibility()
+    texture:SetShown(contentShown)
+    text:SetShown(contentShown)
+    placeholder:SetShown(icon.unlocked and not contentShown)
+    frame:SetShown(icon.enabled and (contentShown or icon.unlocked))
+  end
+  addFeatureFrame(icon, frame, "Imbue Reminder", updateVisibility)
+
   function icon:SetTexture(fileID) texture:SetTexture(fileID) end
   function icon:SetTint(r, g, b) texture:SetVertexColor(r, g, b) end
   function icon:SetText(value) text:SetText(value) end
@@ -46,8 +117,14 @@ function Widgets.CreateIcon(name)
       frame:SetAlpha(1)
     end
   end
-  function icon:Show() frame:Show() end
-  function icon:Hide() frame:Hide() end
+  function icon:Show()
+    contentShown = true
+    updateVisibility()
+  end
+  function icon:Hide()
+    contentShown = false
+    updateVisibility()
+  end
   return icon
 end
 
@@ -129,22 +206,41 @@ function Widgets.CreateTotemBar(name)
   local frame = CreateFrame("Frame", "ShamanTracker" .. name, UIParent)
   frame:SetPoint("CENTER", UIParent, "CENTER", 0, -200)
   local bar = { frame = frame, buttons = {} }
+  local vertical = false
 
   local function layout()
     local count = #bar.buttons
-    frame:SetSize(count * BUTTON_SIZE + math.max(count - 1, 0) * BUTTON_GAP, BUTTON_SIZE)
-    for i, button in ipairs(bar.buttons) do
-      button.frame:ClearAllPoints()
-      button.frame:SetPoint("LEFT", frame, "LEFT", (i - 1) * (BUTTON_SIZE + BUTTON_GAP), 0)
+    local length = count * BUTTON_SIZE + math.max(count - 1, 0) * BUTTON_GAP
+    if vertical then
+      frame:SetSize(BUTTON_SIZE, length)
+    else
+      frame:SetSize(length, BUTTON_SIZE)
     end
+    for i, button in ipairs(bar.buttons) do
+      local offset = (i - 1) * (BUTTON_SIZE + BUTTON_GAP)
+      button.frame:ClearAllPoints()
+      if vertical then
+        button.frame:SetPoint("TOP", frame, "TOP", 0, -offset)
+      else
+        button.frame:SetPoint("LEFT", frame, "LEFT", offset, 0)
+      end
+    end
+  end
+
+  addFeatureFrame(bar, frame, "Totem Bar", function()
+    frame:SetShown(bar.enabled)
+  end)
+
+  function bar:SetVertical(isVertical)
+    vertical = isVertical
+    layout()
   end
 
   -- The control for switching Totem Set: the set's name, under the bar.
   function bar:CreateSetButton()
     local setFrame = CreateFrame("Button", "ShamanTracker" .. name .. "SetButton", frame)
-    setFrame:SetHeight(SET_BUTTON_HEIGHT)
-    setFrame:SetPoint("TOPLEFT", frame, "BOTTOMLEFT", 0, -2)
-    setFrame:SetPoint("TOPRIGHT", frame, "BOTTOMRIGHT", 0, -2)
+    setFrame:SetSize(SET_BUTTON_WIDTH, SET_BUTTON_HEIGHT)
+    setFrame:SetPoint("TOP", frame, "BOTTOM", 0, -2)
     setFrame:RegisterForClicks("LeftButtonUp", "RightButtonUp")
     local label = setFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     label:SetPoint("CENTER")

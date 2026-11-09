@@ -21,7 +21,7 @@ local function totemIcon(game, element, totemName)
   return game:GetSpellIcon(totemName)
 end
 
-function TotemBar.Start(game, db, gate)
+function TotemBar.Start(game, db, gate, settingsCategory)
   db.totemSets = TotemSets.Ensure(db.totemSets or {})
   local saved = db.totemSets -- what the buttons place
   local pending = nil        -- in combat: the Totem Sets with Pending Choices applied
@@ -29,6 +29,34 @@ function TotemBar.Start(game, db, gate)
   local bar = game:CreateTotemBar("TotemBar")
   local buttons = {}
   local controller = { bar = bar, buttons = buttons }
+
+  local frame = ns.FeatureFrame.Attach(game, gate, db, settingsCategory, {
+    key = "totemBar",
+    label = "Totem Bar",
+    frame = bar,
+    protected = true,
+    defaultLayout = { point = "CENTER", relativePoint = "CENTER", x = 0, y = -200 },
+    applyExtra = function(saved) bar:SetVertical(saved.vertical == true) end,
+    onEnabledChanged = function(enabled)
+      if controller.onEnabledChanged then controller.onEnabledChanged(enabled) end
+    end,
+  })
+  frame.addCheckbox({
+    id = "totemBarVertical",
+    label = "Vertical Totem Bar",
+    tooltip = "Stack the Totem Bar's buttons top to bottom instead of left to right.",
+    default = false,
+    get = function() return frame.saved.vertical == true end,
+    set = function(vertical)
+      frame.saved.vertical = vertical
+      frame.apply()
+    end,
+  })
+  controller.frame = frame
+
+  function controller.isEnabled()
+    return frame.saved.enabled
+  end
 
   -- The Totem Sets as the player has left them, Pending Choices included.
   local function current()
@@ -201,6 +229,7 @@ function TotemBar.Start(game, db, gate)
   game:On("spellsChanged", showIcons)
   game:On("totemsChanged", showActiveTotems)
 
+  frame.apply()
   showIcons()
   showActiveTotems()
   gate:Run("totemBar", applySpells)
