@@ -2,7 +2,7 @@
 ## Title: Shaman-tracker
 ## Notes: Imbue Reminder and Totem Bar for Shamans in WoW: Forever.
 ## Author: Jakob
-## Version: 0.1.0-beta.1
+## Version: 0.1.0-beta.2
 ## SavedVariablesPerCharacter: ShamanTrackerDB
 
 # Core/: game logic. Talks to the game only through the game layer; loaded by the tests.
