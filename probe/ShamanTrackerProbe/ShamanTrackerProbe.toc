@@ -1,0 +1,8 @@
+## Interface: 16001
+## Title: Shaman-tracker Probe
+## Notes: Throwaway Phase 0 test addon: prints what the WoW: Forever client allows. Not part of Shaman-tracker.
+## Author: Jakob
+## Version: 0.0.1
+## SavedVariablesPerCharacter: ShamanTrackerProbeDB
+
+Probe.lua
