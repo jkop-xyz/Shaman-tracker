@@ -18,8 +18,6 @@ local WOW_EVENTS = {
   lifeChanged = { { "PLAYER_DEAD" }, { "PLAYER_ALIVE" }, { "PLAYER_UNGHOST" } },
 }
 
-local ICON_SIZE = 40
-
 function ns.CreateRealGame()
   local frame = CreateFrame("Frame")
   local handlers = {}      -- [game event] = { handler, ... }
@@ -141,41 +139,22 @@ function ns.CreateRealGame()
     Settings.CreateSlider(category, setting, options, slider.tooltip)
   end
 
-  -- A display-only icon. Clicks pass through it.
-  function game:CreateIcon(name)
-    local iconFrame = CreateFrame("Frame", "ShamanTracker" .. name, UIParent)
-    iconFrame:SetSize(ICON_SIZE, ICON_SIZE)
-    iconFrame:SetPoint("CENTER", UIParent, "CENTER", 0, -150)
-    iconFrame:EnableMouse(false)
-    iconFrame:Hide()
-    local texture = iconFrame:CreateTexture(nil, "ARTWORK")
-    texture:SetAllPoints()
-    local text = iconFrame:CreateFontString(nil, "OVERLAY", "NumberFontNormal")
-    text:SetPoint("TOP", iconFrame, "BOTTOM", 0, -2)
-
-    local pulse = iconFrame:CreateAnimationGroup()
-    pulse:SetLooping("BOUNCE")
-    local fade = pulse:CreateAnimation("Alpha")
-    fade:SetFromAlpha(1)
-    fade:SetToAlpha(0.35)
-    fade:SetDuration(0.6)
-
-    local icon = { clickable = false }
-    function icon:SetTexture(fileID) texture:SetTexture(fileID) end
-    function icon:SetTint(r, g, b) texture:SetVertexColor(r, g, b) end
-    function icon:SetText(value) text:SetText(value) end
-    function icon:SetPulsing(pulsing)
-      if pulsing and not pulse:IsPlaying() then
-        pulse:Play()
-      elseif not pulsing and pulse:IsPlaying() then
-        pulse:Stop()
-        iconFrame:SetAlpha(1)
-      end
+  function game:GetKnownTotems(slot)
+    local totems = {}
+    for _, spellID in ipairs({ GetMultiCastTotemSpells(slot) }) do
+      table.insert(totems, { name = C_Spell.GetSpellName(spellID), icon = C_Spell.GetSpellTexture(spellID) })
     end
-    function icon:Show() iconFrame:Show() end
-    function icon:Hide() iconFrame:Hide() end
-    return icon
+    return totems
   end
+
+  function game:GetSpellIcon(spellName)
+    return C_Spell.GetSpellTexture(spellName)
+  end
+
+  -- On-screen widgets live in Game/Widgets.lua.
+  function game:CreateIcon(name) return ns.Widgets.CreateIcon(name) end
+  function game:CreateTotemBar(name) return ns.Widgets.CreateTotemBar(name) end
+  function game:ShowMenu(owner, items) ns.Widgets.ShowMenu(owner, items) end
 
   return game
 end
