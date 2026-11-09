@@ -1,4 +1,7 @@
 test:
 	lua5.1 scripts/busted.lua
 
-.PHONY: test
+package: test
+	python3 -I scripts/package.py
+
+.PHONY: test package

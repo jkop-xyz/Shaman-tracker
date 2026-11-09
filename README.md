@@ -4,7 +4,7 @@ A World of Warcraft: Forever addon for Shamans. It has two Features: an **Imbue 
 
 ## Install
 
-Copy the `ShamanTracker` folder into your WoW: Forever `Interface/AddOns/` folder. After adding or updating files, restart the game client; `/reload` doesn't pick up new files. On other classes the addon stays inactive.
+Download the zip from the [latest release](https://github.com/jkop-xyz/Shaman-tracker/releases) and unzip it into your WoW: Forever `Interface/AddOns/` folder, or copy the `ShamanTracker` folder there from a clone. After adding or updating files, restart the game client; `/reload` doesn't pick up new files. On other classes the addon stays inactive.
 
 ## Using it
 
@@ -39,6 +39,10 @@ make test
 ```
 
 Tests only check what a player would see, through the fake game layer: what's shown, the macro text, saved data. They don't cover how the code works internally. The views and the real game layer are checked in-game.
+
+### Releases
+
+`make package` runs the tests, then builds `dist/ShamanTracker-<version>.zip`, using the version from the `.toc` file. Attach it to a GitHub release.
 
 ### Phase 0 test addon
 
