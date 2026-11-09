@@ -14,8 +14,24 @@ function FakeGame.new(ns, options)
     slashCommand = nil,
     settingsCategories = {},
     openedSettings = {},
+    -- Game state tests set directly:
+    dead = false,
+    knownSpells = {},       -- [spellID] = true
+    mainHandIcon = nil,     -- fileID of the equipped main-hand weapon, nil if none
+    mainHandEnchants = {},  -- list of { hasEnchant, enchantType, timeLeft (ms), iconID }
+    -- What's on screen, by name:
+    icons = {},
   }, FakeGame)
 end
+
+-- A fake icon records what it shows, for tests to check.
+local FakeIcon = {}
+FakeIcon.__index = FakeIcon
+
+function FakeIcon:SetTexture(fileID) self.texture = fileID end
+function FakeIcon:SetTint(r, g, b) self.tint = { r, g, b } end
+function FakeIcon:Show() self.shown = true end
+function FakeIcon:Hide() self.shown = false end
 
 -- Game layer methods --------------------------------------------------------
 
@@ -49,6 +65,29 @@ end
 
 function FakeGame:OpenSettings(category)
   table.insert(self.openedSettings, category)
+end
+
+function FakeGame:IsPlayerDead()
+  return self.dead
+end
+
+function FakeGame:IsSpellKnown(spellID)
+  return self.knownSpells[spellID] == true
+end
+
+function FakeGame:GetMainHandWeaponIcon()
+  return self.mainHandIcon
+end
+
+function FakeGame:GetMainHandEnchants()
+  return self.mainHandEnchants
+end
+
+function FakeGame:CreateIcon(name)
+  assert(not self.icons[name], "icon created twice: " .. name)
+  local icon = setmetatable({ name = name, shown = false, clickable = false }, FakeIcon)
+  self.icons[name] = icon
+  return icon
 end
 
 -- Test helpers ----------------------------------------------------------------
