@@ -78,8 +78,22 @@ function FakeTotemButton:RightClick()
   if self.rightClickHandler then self.rightClickHandler() end
 end
 
+-- The Totem Bar's control for switching Totem Set.
+local FakeSetButton = {}
+FakeSetButton.__index = FakeSetButton
+
+function FakeSetButton:SetText(text) self.text = text end
+function FakeSetButton:SetPendingMarker(shown) self.pendingMarker = shown end
+function FakeSetButton:OnClick(handler) self.clickHandler = handler end
+function FakeSetButton:Click() self.clickHandler() end
+
 local FakeTotemBar = {}
 FakeTotemBar.__index = FakeTotemBar
+
+function FakeTotemBar:CreateSetButton()
+  self.setButton = setmetatable({}, FakeSetButton)
+  return self.setButton
+end
 
 function FakeTotemBar:CreateButton(elementKey)
   local button = setmetatable({ game = self.game, element = elementKey }, FakeTotemButton)
@@ -208,8 +222,32 @@ end
 -- Picks a menu item the way the player would; the menu closes.
 function FakeGame:ChooseMenuItem(text)
   local item = self:FindMenuItem(text)
+  assert(not item.disabled, "menu item is disabled: " .. text)
   self.openMenu = nil
   item.onSelect()
+end
+
+-- prompt = { title, default, onAccept = fn(text) }
+function FakeGame:PromptText(prompt)
+  self.openPrompt = prompt
+end
+
+-- confirmation = { text, onAccept = fn() }
+function FakeGame:Confirm(confirmation)
+  self.openConfirmation = confirmation
+end
+
+-- Types into the open prompt and accepts it.
+function FakeGame:AnswerPrompt(text)
+  local prompt = assert(self.openPrompt, "no prompt open")
+  self.openPrompt = nil
+  prompt.onAccept(text)
+end
+
+function FakeGame:AnswerConfirmation(accept)
+  local confirmation = assert(self.openConfirmation, "no confirmation open")
+  self.openConfirmation = nil
+  if accept then confirmation.onAccept() end
 end
 
 function FakeGame:CreateIcon(name)

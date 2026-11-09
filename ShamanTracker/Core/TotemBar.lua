@@ -35,12 +35,18 @@ function TotemBar.Start(game, db, gate)
     return pending or saved
   end
 
+  local setButton
+
+  -- Pending Choice markers, and the set control (which shows the set the
+  -- player has picked, pending or not).
   local function showMarkers()
     for _, element in ipairs(ns.Elements) do
       local isPending = pending ~= nil
         and TotemSets.Chosen(pending, element.key) ~= TotemSets.Chosen(saved, element.key)
       buttons[element.key]:SetPendingMarker(isPending)
     end
+    setButton:SetText(current().active)
+    setButton:SetPendingMarker(pending ~= nil and pending.active ~= saved.active)
   end
 
   -- Icons are safe to change any time; they show what the button places.
@@ -122,6 +128,68 @@ function TotemBar.Start(game, db, gate)
     })
     game:ShowMenu(buttons[element.key], items)
   end
+
+  -- Runs a Totem Sets change; tells the player if it was refused.
+  local function editSets(edit)
+    local ok, reason = controller.edit(edit)
+    if not ok and reason then game:Print(reason) end
+  end
+
+  local function openSetMenu()
+    local data = current()
+    local items = { { title = "Totem Sets" } }
+    for _, name in ipairs(TotemSets.Names(data)) do
+      table.insert(items, {
+        text = name,
+        checked = name == data.active,
+        onSelect = function()
+          editSets(function(sets) TotemSets.Switch(sets, name) return true end)
+        end,
+      })
+    end
+    table.insert(items, { divider = true })
+    table.insert(items, {
+      text = "New set...",
+      onSelect = function()
+        game:PromptText({
+          title = "Name for the new Totem Set:",
+          default = TotemSets.UnusedName(current()),
+          onAccept = function(name)
+            editSets(function(sets) return TotemSets.Create(sets, name) end)
+          end,
+        })
+      end,
+    })
+    local active = data.active
+    table.insert(items, {
+      text = "Rename \"" .. active .. "\"...",
+      onSelect = function()
+        game:PromptText({
+          title = "New name for the Totem Set \"" .. active .. "\":",
+          default = active,
+          onAccept = function(name)
+            editSets(function(sets) return TotemSets.Rename(sets, active, name) end)
+          end,
+        })
+      end,
+    })
+    table.insert(items, {
+      text = "Delete \"" .. active .. "\"...",
+      disabled = #data.sets <= 1,
+      onSelect = function()
+        game:Confirm({
+          text = "Delete the Totem Set \"" .. active .. "\"?",
+          onAccept = function()
+            editSets(function(sets) return TotemSets.Delete(sets, active) end)
+          end,
+        })
+      end,
+    })
+    game:ShowMenu(setButton, items)
+  end
+
+  setButton = bar:CreateSetButton()
+  setButton:OnClick(openSetMenu)
 
   for _, element in ipairs(ns.Elements) do
     local button = bar:CreateButton(element.key)
