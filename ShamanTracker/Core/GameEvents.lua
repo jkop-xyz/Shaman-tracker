@@ -11,6 +11,8 @@ ns.GameEvents = {
   spellsChanged = true,
   -- The player died, released, or came back to life.
   lifeChanged = true,
+  -- A macro was created, changed or deleted.
+  macrosChanged = true,
   -- Once a second, so time-based states stay current.
   tick = true,
 }

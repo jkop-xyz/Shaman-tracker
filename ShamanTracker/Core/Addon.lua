@@ -30,6 +30,8 @@ function Addon.Start(game, db)
   addon.imbueReminder = ns.ImbueReminder.Start(game, db, addon.settingsCategory)
   addon.gate = ns.CombatGate.New(game)
   addon.totemBar = ns.TotemBar.Start(game, db, addon.gate)
+  addon.totemMacros = ns.TotemMacros.Start(game, addon.gate, db.totemSets)
+  addon.totemBar.onApplied = addon.totemMacros.sync
   return addon
 end
 

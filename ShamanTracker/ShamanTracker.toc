@@ -12,6 +12,7 @@ Core/Elements.lua
 Core/TotemSets.lua
 Core/ImbueReminder.lua
 Core/TotemBar.lua
+Core/TotemMacros.lua
 Core/Addon.lua
 
 # Real game layer and bootstrap. The only code that touches the WoW API.
