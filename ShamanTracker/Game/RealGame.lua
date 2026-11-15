@@ -22,6 +22,7 @@ local WOW_EVENTS = {
   lifeChanged = { { "PLAYER_DEAD" }, { "PLAYER_ALIVE" }, { "PLAYER_UNGHOST" } },
   macrosChanged = { { "UPDATE_MACROS" } },
   totemsChanged = { { "PLAYER_TOTEM_UPDATE" } },
+  buffsChanged = { { "UNIT_AURA", "player" } },
 }
 
 function ns.CreateRealGame()
@@ -207,6 +208,15 @@ function ns.CreateRealGame()
     return totems
   end
 
+  -- Out of combat only (Core checks): auras can't be read in combat.
+  function game:PlayerHasBuff(spellIDs)
+    for _, id in ipairs(spellIDs) do
+      local ok, aura = pcall(C_UnitAuras.GetPlayerAuraBySpellID, id)
+      if ok and aura ~= nil and not (issecretvalue and issecretvalue(aura)) then return true end
+    end
+    return false
+  end
+
   -- Looking a spell up by name finds it only in the player's spellbook.
   function game:IsSpellNameKnown(spellName)
     return C_Spell.GetSpellInfo(spellName) ~= nil
@@ -219,6 +229,7 @@ function ns.CreateRealGame()
   -- On-screen widgets live in Game/Widgets.lua.
   function game:CreateIcon(name) return ns.Widgets.CreateIcon(name) end
   function game:CreateBuffTracker(name, spec) return ns.Widgets.CreateBuffTracker(name, spec) end
+  function game:Diagnostics() return ns.Widgets.diagnostics end
   function game:CreateTotemBar(name) return ns.Widgets.CreateTotemBar(name) end
   function game:ShowMenu(owner, items) ns.Widgets.ShowMenu(owner, items) end
   function game:PromptText(prompt) ns.Widgets.PromptText(prompt) end

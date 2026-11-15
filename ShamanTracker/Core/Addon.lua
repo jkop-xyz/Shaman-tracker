@@ -13,6 +13,7 @@ local USAGE = {
   "/st settings - open the settings panel",
   "/st unlock - unlock every Feature so you can drag it",
   "/st lock - lock every Feature in place",
+  "/st status - show what the game accepted for the Buff Trackers",
 }
 
 -- Returns the running addon. On a non-Shaman character it stays inactive:
@@ -46,6 +47,10 @@ function Addon.HandleSlash(addon, msg)
   local command = ((msg or ""):match("^%s*(%S*)") or ""):lower()
   if command == "settings" then
     addon.game:OpenSettings(addon.settingsCategory)
+    return
+  end
+  if command == "status" then
+    for _, line in ipairs(addon.game:Diagnostics()) do addon.game:Print(line) end
     return
   end
   if command == "lock" or command == "unlock" then

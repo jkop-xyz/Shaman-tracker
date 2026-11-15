@@ -3,7 +3,9 @@
 -- Addons can't read auras in combat on Forever, so the game draws these
 -- buffs itself (ADR-0002): the addon only says which spell IDs to show and
 -- at how many stacks to glow. While the buff is down, the tracker shows the
--- spell's icon dimmed, if the player knows the spell.
+-- spell's icon dimmed, if the player knows the spell. A passive talent such
+-- as Maelstrom Weapon may not be found by name, so a buff seen out of combat
+-- counts as known too (remembered per character).
 local _, ns = ...
 
 local BuffTrackers = {}
@@ -33,6 +35,9 @@ BuffTrackers.SPECS = {
 
 -- Returns the trackers' Feature frame controllers, for /st lock and unlock.
 function BuffTrackers.Start(game, gate, db, settingsCategory)
+  db.buffTrackers = db.buffTrackers or {}
+  db.buffTrackers.seen = db.buffTrackers.seen or {}
+  local seen = db.buffTrackers.seen
   local frames = {}
   for _, spec in ipairs(BuffTrackers.SPECS) do
     local tracker = game:CreateBuffTracker(spec.name, {
@@ -49,10 +54,20 @@ function BuffTrackers.Start(game, gate, db, settingsCategory)
     })
 
     local function showPlaceholder()
-      local known = game:IsSpellNameKnown(spec.spellName)
+      local known = seen[spec.key] or game:IsSpellNameKnown(spec.spellName)
       tracker:SetPlaceholder(known and game:GetSpellIcon(spec.spellName) or nil)
     end
+    -- Buffs can only be read out of combat.
+    local function lookForBuff()
+      if seen[spec.key] or game:IsInCombat() then return end
+      if game:PlayerHasBuff(spec.spellIDs) then
+        seen[spec.key] = true
+        showPlaceholder()
+      end
+    end
     game:On("spellsChanged", showPlaceholder)
+    game:On("buffsChanged", lookForBuff)
+    lookForBuff()
 
     frame.apply()
     showPlaceholder()

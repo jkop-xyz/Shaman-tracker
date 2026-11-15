@@ -408,7 +408,21 @@ local function stackFormatter()
   return ok and formatter or nil
 end
 
--- The action bar's proc glow, on a bar the game shows at `glowAt` stacks.
+-- Lines for /st status: what the game accepted or refused, per tracker.
+Widgets.diagnostics = {}
+
+local function diagnose(label, message)
+  table.insert(Widgets.diagnostics, label .. ": " .. message)
+end
+
+local function chat(message)
+  print("|cff0070deShaman-tracker|r: " .. message)
+end
+
+-- The action bar's proc glow, on a bar the game shows at `glowAt` stacks
+-- (it runs SetShown(applications >= minApplications)). The glow starts clear
+-- and is lit by its animation, which the game plays while the aura is shown
+-- and which is also replayed whenever the bar appears.
 local function addStackGlow(button, icon, glowAt)
   local bar = CreateFrame("StatusBar", nil, button)
   bar:SetAllPoints(icon)
@@ -419,24 +433,37 @@ local function addStackGlow(button, icon, glowAt)
   glow:SetAtlas(GLOW_ATLAS)
   glow:SetPoint("CENTER", icon, "CENTER")
   glow:SetSize(ICON_SIZE * 1.4, ICON_SIZE * 1.4)
+  glow:SetAlpha(0)
   local anim = glow:CreateAnimationGroup()
   anim:SetLooping("REPEAT")
+  local lit = anim:CreateAnimation("Alpha")
+  lit:SetFromAlpha(1)
+  lit:SetToAlpha(1)
+  lit:SetDuration(0.001)
+  lit:SetOrder(1)
   local flip = anim:CreateAnimation("FlipBook")
   flip:SetDuration(1)
+  flip:SetOrder(2)
   flip:SetFlipBookRows(6)
   flip:SetFlipBookColumns(5)
   flip:SetFlipBookFrames(30)
   flip:SetFlipBookFrameWidth(0)
   flip:SetFlipBookFrameHeight(0)
-  anim:Play()
+  bar:HookScript("OnShow", function() anim:Play() end)
+  pcall(button.AddAuraShownAnimation, button, anim)
   button:SetApplicationBar(bar, { minApplications = glowAt, maxApplications = glowAt })
 end
 
-local function initializeBuffButton(spec)
+local function initializeBuffButton(spec, container)
   return function(button)
     if not button then return end
     local ok, err = pcall(function()
-      button:SetSize(ICON_SIZE, ICON_SIZE)
+      -- The game doesn't place slot buttons: anchor it over the container.
+      button:ClearAllPoints()
+      button:SetAllPoints(container)
+      button:SetFrameLevel(container:GetFrameLevel() + 1)
+      button:EnableMouse(false)
+
       local icon = button:CreateTexture(nil, "ARTWORK")
       icon:SetAllPoints()
       button:SetIcon(icon)
@@ -445,7 +472,7 @@ local function initializeBuffButton(spec)
       cooldown:SetAllPoints(icon)
       cooldown:SetDrawEdge(false)
       cooldown:SetHideCountdownNumbers(true)
-      pcall(button.SetDurationCooldown, button, cooldown)
+      local okCooldown = pcall(button.SetDurationCooldown, button, cooldown)
 
       local count = button:CreateFontString(nil, "OVERLAY", "NumberFontNormalLarge")
       count:SetPoint("BOTTOMRIGHT", icon, "BOTTOMRIGHT", -2, 2)
@@ -453,18 +480,29 @@ local function initializeBuffButton(spec)
       if not (formatter and pcall(button.SetApplicationCount, button, count, { formatter = formatter })) then
         button:SetApplicationCount(count)
       end
+      diagnose(spec.label, "button ready (swipe " .. (okCooldown and "ok" or "refused") .. ")")
 
       if spec.glowAt then
         local okGlow, why = pcall(addStackGlow, button, icon, spec.glowAt)
-        if not okGlow then
-          print("|cff0070deShaman-tracker|r: " .. spec.label .. " glow refused by the game: " .. tostring(why))
-        end
+        diagnose(spec.label, okGlow and ("glow at " .. spec.glowAt .. " stacks ok")
+          or ("glow refused: " .. tostring(why)))
+        if not okGlow then chat(spec.label .. " glow refused by the game: " .. tostring(why)) end
       end
     end)
     if not ok then
-      print("|cff0070deShaman-tracker|r: " .. spec.label .. " couldn't be set up: " .. tostring(err))
+      diagnose(spec.label, "button setup failed: " .. tostring(err))
+      chat(spec.label .. " couldn't be set up: " .. tostring(err))
     end
   end
+end
+
+-- Blizzard_AuraContainer brings the template; it may not be loaded yet.
+local function auraContainerLoaded()
+  if not (C_AddOns and C_AddOns.IsAddOnLoaded) or C_AddOns.IsAddOnLoaded("Blizzard_AuraContainer") then
+    return true
+  end
+  local loaded, reason = C_AddOns.LoadAddOn("Blizzard_AuraContainer")
+  return loaded, reason
 end
 
 -- spec = { label, spellIDs, glowAt }
@@ -487,6 +525,7 @@ function Widgets.CreateBuffTracker(name, spec)
   local function updateVisibility()
     frame:SetShown(tracker.enabled)
     placeholder:SetShown(placeholderIcon ~= nil)
+    if tracker.container then pcall(tracker.container.SetEnabled, tracker.container, tracker.enabled == true) end
   end
   addFeatureFrame(tracker, frame, spec.label, updateVisibility)
 
@@ -499,25 +538,35 @@ function Widgets.CreateBuffTracker(name, spec)
   -- Out of combat only: hands the buff to the game to draw.
   function tracker:Activate()
     if tracker.container then return end
+    local loaded, reason = auraContainerLoaded()
+    if not loaded then
+      diagnose(spec.label, "Blizzard_AuraContainer didn't load: " .. tostring(reason))
+      chat(spec.label .. ": the game's aura display didn't load (" .. tostring(reason) .. ")")
+      return
+    end
     local ok, container = pcall(CreateFrame, "AuraContainer", nil, frame, "CustomAuraContainerTemplate")
     if not (ok and container) then
-      print("|cff0070deShaman-tracker|r: the game's aura display isn't available: " .. tostring(container))
+      diagnose(spec.label, "aura container refused: " .. tostring(container))
+      chat(spec.label .. ": the game's aura display isn't available: " .. tostring(container))
       return
     end
     container:SetAllPoints(frame)
     container:SetFrameLevel(frame:GetFrameLevel() + 3)
     pcall(container.SetUnit, container, "player")
+    if CustomAuraContainerAuraProcessingPolicy then
+      pcall(container.SetAuraProcessingPolicy, container, CustomAuraContainerAuraProcessingPolicy.None)
+    end
     local ids = {}
     for _, id in ipairs(spec.spellIDs) do ids[id] = true end
     local okSlot, why = pcall(container.AddAuraSlot, container, name, "HELPFUL", {
       candidateFilters = { includeSpellIDs = ids },
-      initializeFrame = initializeBuffButton(spec),
+      initializeFrame = initializeBuffButton(spec, container),
     })
-    if not okSlot then
-      print("|cff0070deShaman-tracker|r: " .. spec.label .. " refused by the game: " .. tostring(why))
-    end
+    diagnose(spec.label, okSlot and "aura slot ok" or ("aura slot refused: " .. tostring(why)))
+    if not okSlot then chat(spec.label .. " refused by the game: " .. tostring(why)) end
     container:Show()
     tracker.container = container
+    updateVisibility()
   end
 
   return tracker

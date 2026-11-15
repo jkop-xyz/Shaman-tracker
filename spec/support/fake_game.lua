@@ -85,6 +85,8 @@ function FakeGame.new(ns, options)
     icons = {},
     buffTrackers = {},      -- [name] = FakeBuffTracker
     knownSpellNames = {},   -- [spell name] = true
+    playerBuffs = {},       -- [spellID] = true; readable out of combat only
+    diagnostics = {},       -- lines the real game layer would report for /st status
     totemBars = {},
     openMenu = nil,         -- { owner, items } of the last menu shown
     -- What the player did:
@@ -324,6 +326,19 @@ function FakeGame:CreateBuffTracker(name, spec)
   local tracker = setmetatable({ game = self, name = name, spec = spec, protected = true }, FakeBuffTracker)
   self.buffTrackers[name] = tracker
   return tracker
+end
+
+-- Like the game, refuses to read auras in combat.
+function FakeGame:PlayerHasBuff(spellIDs)
+  assert(not self.inCombat, "blocked: auras read in combat")
+  for _, id in ipairs(spellIDs) do
+    if self.playerBuffs[id] then return true end
+  end
+  return false
+end
+
+function FakeGame:Diagnostics()
+  return self.diagnostics
 end
 
 function FakeGame:IsSpellNameKnown(spellName)

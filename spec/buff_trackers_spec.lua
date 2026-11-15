@@ -60,6 +60,34 @@ describe("Buff Trackers", function()
       assert.is_nil(maelstrom.placeholder)
     end)
 
+    it("shows the icon for a talent the name lookup misses, once its buff has been seen", function()
+      game.knownSpellNames["Maelstrom Weapon"] = nil
+      local maelstrom = start()
+      assert.is_nil(maelstrom.placeholder)
+      game.playerBuffs[408505] = true
+      game:Fire("buffsChanged")
+      assert.are.equal(136048, maelstrom.placeholder)
+    end)
+
+    it("remembers a seen buff across reloads", function()
+      game.knownSpellNames["Maelstrom Weapon"] = nil
+      game.playerBuffs[408505] = true
+      start()
+      local reloaded = FakeGame.new(ns)
+      reloaded.spellIcons = game.spellIcons
+      ns.Addon.Start(reloaded, db)
+      assert.are.equal(136048, reloaded.buffTrackers.MaelstromTracker.placeholder)
+    end)
+
+    it("doesn't look at buffs in combat", function()
+      game.knownSpellNames["Maelstrom Weapon"] = nil
+      local maelstrom = start()
+      game:Fire("combatStarted")
+      game.playerBuffs[408505] = true
+      game:Fire("buffsChanged")
+      assert.is_nil(maelstrom.placeholder)
+    end)
+
     it("shows the icon once the player learns the spell", function()
       game.knownSpellNames["Maelstrom Weapon"] = nil
       local maelstrom = start()
@@ -127,6 +155,13 @@ describe("Buff Trackers", function()
       game:Fire("combatEnded")
       assert.are.equal(1.2, maelstrom.layout.scale)
     end)
+  end)
+
+  it("/st status prints what the game accepted for each tracker", function()
+    start()
+    game.diagnostics = { "Maelstrom Weapon Tracker: slot ok, glow ok" }
+    game:Type("/st status")
+    assert.are.same({ "Maelstrom Weapon Tracker: slot ok, glow ok" }, game.printed)
   end)
 
   it("aren't created on a non-Shaman character", function()
