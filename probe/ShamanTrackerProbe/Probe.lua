@@ -457,7 +457,10 @@ end
 
 local TRACKED_AURAS = { "Lightning Shield", "Maelstrom Weapon", "Water Shield" }
 -- Classic spell IDs to try even if the name scan finds nothing.
-local CANDIDATE_AURA_IDS = { 324, 325, 905, 945, 8134, 10431, 10432, 51530, 53817 }
+local CANDIDATE_AURA_IDS = { 324, 325, 905, 945, 8134, 10431, 10432, 51530, 53817, 408505 }
+-- Maelstrom Weapon and Lightning Shield (rank 1) as seen in round 3.
+local DEFAULT_MW_ID, DEFAULT_LS_ID = 408505, 324
+local POLL_LINES = 40
 local LIGHTNING_BOLT_IDS = { 403, 529, 548, 915, 943, 6041, 10391, 10392, 15207, 15208 }
 local STRIP_SIZE = 10
 local AURA_LOG_BUDGET = 25
@@ -466,6 +469,7 @@ local knownAuraIDs = {}      -- [name] = spellId, learned while readable
 local knownInstances = {}    -- [name] = auraInstanceID, learned while readable
 local auraStrip = {}         -- icons with stack text, fed only by pass-through
 local auraLogBudget = AURA_LOG_BUDGET
+local lightningBoltCastTime -- defined with the round 4 poll below
 
 local function trackedName(name)
   if isSecret(name) or type(name) ~= "string" then return nil end
@@ -559,6 +563,9 @@ local function checkAuras(label)
       .. " spellId=" .. fmt(data.spellId)) or (okData and "gone" or ("ERR " .. tostring(data))))
   end
 
+  out("aura", "cooldownManager", "C_CooldownViewer=" .. fmt(C_CooldownViewer ~= nil),
+    "boltCast=" .. lightningBoltCastTime())
+
   -- 3. The pass-through strip.
   out("aura", "strip", updateAuraStrip())
 
@@ -572,9 +579,19 @@ local function checkAuras(label)
   endRun()
 end
 
+local secretUpdateLogged = false
+
 local function onUnitAura(updateInfo)
   updateAuraStrip()
   if not inCombat() or auraLogBudget <= 0 or not updateInfo then return end
+  -- Round 3: in combat the whole updateInfo table is secret.
+  if isSecret(updateInfo) then
+    if not secretUpdateLogged then
+      secretUpdateLogged = true
+      out("aura", "unitAura", "updateInfo is secret in combat")
+    end
+    return
+  end
   for _, aura in ipairs(updateInfo.addedAuras or {}) do
     if auraLogBudget <= 0 then break end
     auraLogBudget = auraLogBudget - 1
@@ -587,6 +604,53 @@ local function onUnitAura(updateInfo)
     local ok, count = pcall(C_UnitAuras.GetAuraApplicationDisplayCount, "player", id, 1, 99)
     out("aura", "updated in combat", "instance=" .. fmt(id), "count=" .. (ok and fmt(count) or "ERR"))
   end
+end
+
+-- Round 4: once a second in combat, try the routes round 3 couldn't reach.
+local pollTicker, pollStart, pollLines
+
+local function shortError(err)
+  return "ERR " .. tostring(err):gsub("\n.*", ""):sub(1, 70)
+end
+
+-- Direct lookup; works only if the game treats the aura as non-secret.
+local function describeAuraByID(id)
+  local ok, aura = pcall(C_UnitAuras.GetPlayerAuraBySpellID, id)
+  if not ok then return shortError(aura) end
+  if aura == nil then return "nil" end
+  if isSecret(aura) then return "<secret table>" end
+  return "stacks=" .. fmt(aura.applications)
+end
+
+-- Maelstrom Weapon may shorten Lightning Bolt's cast time per stack.
+function lightningBoltCastTime()
+  local ok, info = pcall(C_Spell.GetSpellInfo, "Lightning Bolt")
+  if not ok then return shortError(info) end
+  if info == nil then return "nil" end
+  if isSecret(info) then return "<secret table>" end
+  return fmt(info.castTime)
+end
+
+local function overlayedBolts()
+  if not C_SpellActivationOverlay then return "no API" end
+  local lit = {}
+  for _, id in ipairs(LIGHTNING_BOLT_IDS) do
+    local ok, glowing = pcall(C_SpellActivationOverlay.IsSpellOverlayed, id)
+    if not ok then return shortError(glowing) end
+    if isSecret(glowing) then return "<secret>" end
+    if glowing then table.insert(lit, id) end
+  end
+  return #lit > 0 and table.concat(lit, ",") or "none"
+end
+
+local function pollCombat()
+  if pollLines <= 0 then return end
+  pollLines = pollLines - 1
+  local mw = knownAuraIDs["Maelstrom Weapon"] or DEFAULT_MW_ID
+  local ls = knownAuraIDs["Lightning Shield"] or DEFAULT_LS_ID
+  out("poll", ("t=%ds"):format(GetTime() - pollStart), "MW=" .. describeAuraByID(mw),
+    "LS=" .. describeAuraByID(ls), "boltCast=" .. lightningBoltCastTime(),
+    "boltGlow=" .. overlayedBolts())
 end
 
 local frame = CreateFrame("Frame")
@@ -636,6 +700,10 @@ frame:SetScript("OnEvent", function(_, event, ...)
   elseif event == "PLAYER_REGEN_DISABLED" then
     out("combat", "entered")
     auraLogBudget = AURA_LOG_BUDGET
+    secretUpdateLogged = false
+    pollStart, pollLines = GetTime(), POLL_LINES
+    if pollTicker then pollTicker:Cancel() end
+    pollTicker = C_Timer.NewTicker(1, function() try("poll", "tick", pollCombat) end)
     C_Timer.After(1, function()
       if macroTestArmed then runMacroCombatEdit() end
       runCombatReads("in combat")
@@ -646,6 +714,8 @@ frame:SetScript("OnEvent", function(_, event, ...)
     end)
   elseif event == "PLAYER_REGEN_ENABLED" then
     out("combat", "left")
+    if pollTicker then pollTicker:Cancel() pollTicker = nil end
+    out("poll", "afterCombat", "boltCast=" .. lightningBoltCastTime())
     C_Timer.After(1, function() checkAuras("just after combat") end)
   elseif event == "UNIT_AURA" then
     local _, updateInfo = ...

@@ -46,6 +46,16 @@ Checks whether buff stacks can be shown in combat, and whether anything fires at
 5. If you reach 5 Maelstrom Weapon stacks, does Lightning Bolt light up on your action bar? `/stp note` that too.
 6. Type `/stp copy`, press Ctrl+C, and paste it.
 
+## Round 4: auras, polled in combat
+
+Round 3 showed that most aura functions refuse to work in combat. This round tries the routes that are left, **once a second for the whole fight**. Each `poll` line records the Maelstrom Weapon and Lightning Shield lookup by spell ID, Lightning Bolt's cast time, and whether Lightning Bolt has a proc glow.
+
+1. Type `/stp clear`.
+2. **Out of combat:** cast Lightning Shield, then type `/stp auras`.
+3. **Fight a mob or training dummy for at least 20 seconds**, not a duel, so your shield isn't eaten straight away. Melee until you have **5 Maelstrom Weapon stacks**, then cast Lightning Bolt.
+4. At 5 stacks, look at Lightning Bolt on your action bar: does it glow? Is it instant? Record it, e.g. `/stp note at 5 MW: bolt glows yes, instant yes`.
+5. Type `/stp copy`, press Ctrl+C, and paste it.
+
 ## What to paste back on issue #9
 
 **Easiest:** type `/stp copy`, press Ctrl+C, and paste. The window holds the last 20 runs plus every line printed outside a run: clicks, totem updates, casts, blocked actions and your notes. Alternatively, `/reload` and paste the contents of:
