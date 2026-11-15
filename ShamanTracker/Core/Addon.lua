@@ -36,6 +36,9 @@ function Addon.Start(game, db)
   addon.totemBar.onApplied = addon.totemMacros.sync
   addon.totemBar.onEnabledChanged = addon.totemMacros.sync
   addon.featureFrames = { addon.imbueReminder.frame, addon.totemBar.frame }
+  for _, frame in ipairs(ns.BuffTrackers.Start(game, addon.gate, db, addon.settingsCategory)) do
+    table.insert(addon.featureFrames, frame)
+  end
   return addon
 end
 

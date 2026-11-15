@@ -384,3 +384,141 @@ end
 function Widgets.Confirm(confirmation)
   StaticPopup_Show(CONFIRM, confirmation.text, nil, confirmation)
 end
+
+---------------------------------------------------------------------------
+-- Buff Tracker (ADR-0002): one buff drawn by the game's own aura button.
+-- Addons can't read auras in combat, so a CustomAuraContainerTemplate slot
+-- shows the buff: the game fills in its icon, stack count and duration swipe
+-- and keeps them current in combat. Nothing is read back from the button.
+-- The glow at N stacks hangs on the button's application bar, which the game
+-- shows only while applications >= minApplications.
+---------------------------------------------------------------------------
+
+local GLOW_ATLAS = "UI-HUD-ActionBar-Proc-Loop-Flipbook"
+local WHITE = "Interface\\Buttons\\WHITE8X8"
+
+-- Shows every stack count, 1 included (the game's default hides 1).
+local function stackFormatter()
+  if not (C_StringUtil and C_StringUtil.CreateNumericRuleFormatter) then return nil end
+  local ok, formatter = pcall(function()
+    local f = C_StringUtil.CreateNumericRuleFormatter()
+    f:SetBreakpoints({ { threshold = 0, format = "%d" } })
+    return f
+  end)
+  return ok and formatter or nil
+end
+
+-- The action bar's proc glow, on a bar the game shows at `glowAt` stacks.
+local function addStackGlow(button, icon, glowAt)
+  local bar = CreateFrame("StatusBar", nil, button)
+  bar:SetAllPoints(icon)
+  bar:SetFrameLevel(button:GetFrameLevel() + 5)
+  bar:SetStatusBarTexture(WHITE)
+  bar:SetStatusBarColor(0, 0, 0, 0)
+  local glow = bar:CreateTexture(nil, "OVERLAY")
+  glow:SetAtlas(GLOW_ATLAS)
+  glow:SetPoint("CENTER", icon, "CENTER")
+  glow:SetSize(ICON_SIZE * 1.4, ICON_SIZE * 1.4)
+  local anim = glow:CreateAnimationGroup()
+  anim:SetLooping("REPEAT")
+  local flip = anim:CreateAnimation("FlipBook")
+  flip:SetDuration(1)
+  flip:SetFlipBookRows(6)
+  flip:SetFlipBookColumns(5)
+  flip:SetFlipBookFrames(30)
+  flip:SetFlipBookFrameWidth(0)
+  flip:SetFlipBookFrameHeight(0)
+  anim:Play()
+  button:SetApplicationBar(bar, { minApplications = glowAt, maxApplications = glowAt })
+end
+
+local function initializeBuffButton(spec)
+  return function(button)
+    if not button then return end
+    local ok, err = pcall(function()
+      button:SetSize(ICON_SIZE, ICON_SIZE)
+      local icon = button:CreateTexture(nil, "ARTWORK")
+      icon:SetAllPoints()
+      button:SetIcon(icon)
+
+      local cooldown = CreateFrame("Cooldown", nil, button, "CooldownFrameTemplate")
+      cooldown:SetAllPoints(icon)
+      cooldown:SetDrawEdge(false)
+      cooldown:SetHideCountdownNumbers(true)
+      pcall(button.SetDurationCooldown, button, cooldown)
+
+      local count = button:CreateFontString(nil, "OVERLAY", "NumberFontNormalLarge")
+      count:SetPoint("BOTTOMRIGHT", icon, "BOTTOMRIGHT", -2, 2)
+      local formatter = stackFormatter()
+      if not (formatter and pcall(button.SetApplicationCount, button, count, { formatter = formatter })) then
+        button:SetApplicationCount(count)
+      end
+
+      if spec.glowAt then
+        local okGlow, why = pcall(addStackGlow, button, icon, spec.glowAt)
+        if not okGlow then
+          print("|cff0070deShaman-tracker|r: " .. spec.label .. " glow refused by the game: " .. tostring(why))
+        end
+      end
+    end)
+    if not ok then
+      print("|cff0070deShaman-tracker|r: " .. spec.label .. " couldn't be set up: " .. tostring(err))
+    end
+  end
+end
+
+-- spec = { label, spellIDs, glowAt }
+function Widgets.CreateBuffTracker(name, spec)
+  local frame = CreateFrame("Frame", "ShamanTracker" .. name, UIParent)
+  frame:SetSize(ICON_SIZE, ICON_SIZE)
+  frame:SetPoint("CENTER")
+  frame:EnableMouse(false)
+
+  -- The spell's icon, dimmed, under the game's button: seen while the buff is down.
+  local placeholder = frame:CreateTexture(nil, "BACKGROUND")
+  placeholder:SetAllPoints()
+  placeholder:SetDesaturated(true)
+  placeholder:SetAlpha(0.4)
+  placeholder:Hide()
+
+  local tracker = { frame = frame }
+  local placeholderIcon
+
+  local function updateVisibility()
+    frame:SetShown(tracker.enabled)
+    placeholder:SetShown(placeholderIcon ~= nil)
+  end
+  addFeatureFrame(tracker, frame, spec.label, updateVisibility)
+
+  function tracker:SetPlaceholder(fileID)
+    placeholderIcon = fileID
+    if fileID then placeholder:SetTexture(fileID) end
+    updateVisibility()
+  end
+
+  -- Out of combat only: hands the buff to the game to draw.
+  function tracker:Activate()
+    if tracker.container then return end
+    local ok, container = pcall(CreateFrame, "AuraContainer", nil, frame, "CustomAuraContainerTemplate")
+    if not (ok and container) then
+      print("|cff0070deShaman-tracker|r: the game's aura display isn't available: " .. tostring(container))
+      return
+    end
+    container:SetAllPoints(frame)
+    container:SetFrameLevel(frame:GetFrameLevel() + 3)
+    pcall(container.SetUnit, container, "player")
+    local ids = {}
+    for _, id in ipairs(spec.spellIDs) do ids[id] = true end
+    local okSlot, why = pcall(container.AddAuraSlot, container, name, "HELPFUL", {
+      candidateFilters = { includeSpellIDs = ids },
+      initializeFrame = initializeBuffButton(spec),
+    })
+    if not okSlot then
+      print("|cff0070deShaman-tracker|r: " .. spec.label .. " refused by the game: " .. tostring(why))
+    end
+    container:Show()
+    tracker.container = container
+  end
+
+  return tracker
+end

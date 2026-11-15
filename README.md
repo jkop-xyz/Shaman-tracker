@@ -1,6 +1,6 @@
 # Shaman-tracker
 
-A World of Warcraft: Forever addon for Shamans. It has two Features: an **Imbue Reminder** and a **Totem Bar**. The spec is in issue #1, the domain language is in [GLOSSARY.md](GLOSSARY.md), and decisions are in [docs/adr/](docs/adr/).
+A World of Warcraft: Forever addon for Shamans. It has four Features: an **Imbue Reminder**, a **Totem Bar**, and two **Buff Trackers** (Maelstrom Weapon and Lightning Shield). The spec is in issue #1, the domain language is in [GLOSSARY.md](GLOSSARY.md), and decisions are in [docs/adr/](docs/adr/).
 
 ## Install
 
@@ -14,6 +14,7 @@ Download the zip from the [latest release](https://github.com/jkop-xyz/Shaman-tr
   - A **badge with a countdown** shows the totem that's actually up.
   - **The set name under the bar** opens the Totem Set menu: switch, new, rename, delete.
   - **Changes made in combat** are marked with a gold dot and applied when combat ends.
+- **Buff Trackers:** Maelstrom Weapon stacks (glowing at 5) and Lightning Shield charges, kept current in combat. While the buff is down, the spell's icon shows dimmed.
 - **Totem Macros:** `ST Earth`, `ST Fire`, `ST Water`, `ST Air` and `ST All` (places every Chosen Totem, one per press) are kept up to date for your own action bars and keybinds. Don't edit them; they get overwritten.
 - **Commands:**
   - `/st settings`: show or hide each Feature, set its size, lock it, make the Totem Bar vertical, and set the Imbue warning time.
