@@ -35,6 +35,17 @@ The first round answered most questions. This round covers what's left: totem da
 4. **Button casting:** type `/stp button Searing Totem` out of combat, and click the test button. Then enter combat and click it again. While in combat, type `/stp button Stoneskin Totem`. Record whether the totems dropped, for example `/stp note button: out of combat dropped, in combat dropped`.
 5. Type `/stp copy`. A window opens with everything already selected; press Ctrl+C and paste it on issue #9, or here.
 
+## Round 3: auras (Lightning Shield, Maelstrom Weapon)
+
+Checks whether buff stacks can be shown in combat, and whether anything fires at 5 Maelstrom Weapon stacks. A row of small buff icons labelled "STP buffs:" now sits under the test button. It's fed only with values the addon passes through without reading.
+
+1. Type `/stp clear`.
+2. **Out of combat:** cast Lightning Shield, then type `/stp auras`.
+3. **In combat:** fight a mob or training dummy for at least 10 seconds, meleeing so Maelstrom Weapon stacks build up, if you have the talent. The probe checks automatically 8 seconds into the fight, and again just after it ends.
+4. While in combat, look at the "STP buffs:" row: do the icons show, with stack numbers on Lightning Shield and Maelstrom Weapon? Record it, e.g. `/stp note in combat: buff icons yes, LS number yes, MW number no`.
+5. If you reach 5 Maelstrom Weapon stacks, does Lightning Bolt light up on your action bar? `/stp note` that too.
+6. Type `/stp copy`, press Ctrl+C, and paste it.
+
 ## What to paste back on issue #9
 
 **Easiest:** type `/stp copy`, press Ctrl+C, and paste. The window holds the last 20 runs plus every line printed outside a run: clicks, totem updates, casts, blocked actions and your notes. Alternatively, `/reload` and paste the contents of:
