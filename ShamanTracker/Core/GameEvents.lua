@@ -13,6 +13,8 @@ ns.GameEvents = {
   lifeChanged = true,
   -- A totem was placed, expired or destroyed.
   totemsChanged = true,
+  -- The player's buffs changed.
+  buffsChanged = true,
   -- A macro was created, changed or deleted.
   macrosChanged = true,
   -- Once a second, so time-based states stay current.
