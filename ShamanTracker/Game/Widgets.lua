@@ -388,7 +388,7 @@ end
 ---------------------------------------------------------------------------
 -- Buff Tracker (ADR-0002): one buff drawn by the game's own aura button.
 -- Addons can't read auras in combat, so a CustomAuraContainerTemplate slot
--- shows the buff: the game fills in its icon, stack count and duration swipe
+-- shows the buff: the game fills in its icon, stack count and time left
 -- and keeps them current in combat. Nothing is read back from the button.
 -- The glow at N stacks hangs on the button's application bar, which the game
 -- shows only while applications >= minApplications.
@@ -488,11 +488,6 @@ local function initializeBuffButton(spec, container)
       icon:SetAllPoints()
       button:SetIcon(icon)
 
-      local cooldown = CreateFrame("Cooldown", nil, button, "CooldownFrameTemplate")
-      cooldown:SetAllPoints(icon)
-      cooldown:SetDrawEdge(false)
-      cooldown:SetHideCountdownNumbers(true)
-      local okCooldown = pcall(button.SetDurationCooldown, button, cooldown)
 
       local count = button:CreateFontString(nil, "OVERLAY", "NumberFontNormalLarge")
       count:SetPoint("BOTTOMRIGHT", icon, "BOTTOMRIGHT", -2, 2)
@@ -504,8 +499,9 @@ local function initializeBuffButton(spec, container)
       local timeLeft = button:CreateFontString(nil, "OVERLAY", "NumberFontNormal")
       timeLeft:SetPoint("TOP", icon, "TOP", 0, -2)
       local okTime, whyTime = pcall(button.SetDurationText, button, timeLeft)
-      diagnose(spec.label, "button ready (swipe " .. (okCooldown and "ok" or "refused")
-        .. ", countdown " .. (okTime and "ok" or ("refused: " .. tostring(whyTime))) .. ")")
+      -- Only the number shows the time left; no clockwise swipe as well.
+      diagnose(spec.label, "button ready (countdown "
+        .. (okTime and "ok" or ("refused: " .. tostring(whyTime))) .. ")")
 
       if spec.glowAt then
         local okGlow, why = pcall(addStackGlow, button, icon, spec.glowAt)
