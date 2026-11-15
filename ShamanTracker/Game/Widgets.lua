@@ -85,8 +85,10 @@ function Widgets.CreateIcon(name)
   placeholder:SetAllPoints()
   placeholder:SetTexture(PLACEHOLDER_ICON)
   placeholder:Hide()
+  -- Inside the icon's bottom edge, so the countdown never sticks out into
+  -- whatever sits below the icon (such as the Totem Bar).
   local text = frame:CreateFontString(nil, "OVERLAY", "NumberFontNormal")
-  text:SetPoint("TOP", frame, "BOTTOM", 0, -2)
+  text:SetPoint("BOTTOM", frame, "BOTTOM", 0, 2)
 
   local pulse = frame:CreateAnimationGroup()
   pulse:SetLooping("BOUNCE")

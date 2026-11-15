@@ -450,6 +450,145 @@ end
 -- Events
 ---------------------------------------------------------------------------
 
+---------------------------------------------------------------------------
+-- Aura test (round 3): can Maelstrom Weapon and Lightning Shield stacks be
+-- read, or at least shown, in combat? And does anything fire at 5 stacks?
+---------------------------------------------------------------------------
+
+local TRACKED_AURAS = { "Lightning Shield", "Maelstrom Weapon", "Water Shield" }
+-- Classic spell IDs to try even if the name scan finds nothing.
+local CANDIDATE_AURA_IDS = { 324, 325, 905, 945, 8134, 10431, 10432, 51530, 53817 }
+local LIGHTNING_BOLT_IDS = { 403, 529, 548, 915, 943, 6041, 10391, 10392, 15207, 15208 }
+local STRIP_SIZE = 10
+local AURA_LOG_BUDGET = 25
+
+local knownAuraIDs = {}      -- [name] = spellId, learned while readable
+local knownInstances = {}    -- [name] = auraInstanceID, learned while readable
+local auraStrip = {}         -- icons with stack text, fed only by pass-through
+local auraLogBudget = AURA_LOG_BUDGET
+
+local function trackedName(name)
+  if isSecret(name) or type(name) ~= "string" then return nil end
+  for _, tracked in ipairs(TRACKED_AURAS) do
+    if name == tracked then return tracked end
+  end
+end
+
+local function createAuraStrip()
+  for i = 1, STRIP_SIZE do
+    local f = CreateFrame("Frame", "STPAuraStrip" .. i, UIParent)
+    f:SetSize(28, 28)
+    f:SetPoint("TOP", castButton, "BOTTOM", (i - (STRIP_SIZE + 1) / 2) * 30, -60)
+    f.icon = f:CreateTexture(nil, "ARTWORK")
+    f.icon:SetAllPoints()
+    f.icon:SetColorTexture(0.2, 0.2, 0.2, 0.6)
+    f.count = f:CreateFontString(nil, "OVERLAY", "NumberFontNormal")
+    f.count:SetPoint("BOTTOMRIGHT", -1, 1)
+    auraStrip[i] = f
+  end
+  local label = auraStrip[1]:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+  label:SetPoint("RIGHT", auraStrip[1], "LEFT", -4, 0)
+  label:SetText("STP buffs:")
+end
+
+-- Fills the strip with the player's buffs, using only values passed straight
+-- to widgets. Returns a short status for the log.
+local function updateAuraStrip()
+  local ok, ids = pcall(C_UnitAuras.GetUnitAuraInstanceIDs, "player", "HELPFUL")
+  if not ok then return "instanceIDs ERR " .. tostring(ids) end
+  if isSecret(ids) then return "instanceIDs <secret>" end
+  local status = "instanceIDs=" .. #ids
+  for i = 1, STRIP_SIZE do
+    local f, id = auraStrip[i], ids[i]
+    if id then
+      local okData, data = pcall(C_UnitAuras.GetAuraDataByAuraInstanceID, "player", id)
+      local okIcon = okData and data and pcall(f.icon.SetTexture, f.icon, data.icon)
+      local okCount, count = pcall(C_UnitAuras.GetAuraApplicationDisplayCount, "player", id, 1, 99)
+      if okCount then pcall(f.count.SetText, f.count, count) end
+      if i == 1 then
+        status = status .. " first: data=" .. (okData and "ok" or "ERR") .. " icon=" .. fmt(okIcon)
+          .. " count=" .. (okCount and fmt(count) or ("ERR " .. tostring(count)))
+      end
+    else
+      f.icon:SetColorTexture(0.2, 0.2, 0.2, 0.6)
+      f.count:SetText("")
+    end
+  end
+  return status
+end
+
+-- Out of combat, buffs are readable: learn the tracked auras' IDs.
+local function scanTrackedAuras()
+  for i = 1, 40 do
+    local aura = C_UnitAuras.GetBuffDataByIndex("player", i)
+    if not aura then break end
+    local name = trackedName(aura.name)
+    if name then
+      knownAuraIDs[name] = aura.spellId
+      knownInstances[name] = aura.auraInstanceID
+      out("aura", "found", name, "spellId=" .. fmt(aura.spellId), "stacks=" .. fmt(aura.applications),
+        "instance=" .. fmt(aura.auraInstanceID), "max=" .. fmt(aura.maxCharges))
+    end
+  end
+end
+
+local function checkAuras(label)
+  beginRun("auras " .. label)
+  if not inCombat() then try("aura", "scan", scanTrackedAuras) end
+
+  -- 1. Direct lookup by spell ID (works only for non-secret auras).
+  local ids, seen = {}, {}
+  for _, id in pairs(knownAuraIDs) do if not seen[id] then seen[id] = true table.insert(ids, id) end end
+  for _, id in ipairs(CANDIDATE_AURA_IDS) do if not seen[id] then seen[id] = true table.insert(ids, id) end end
+  for _, id in ipairs(ids) do
+    local ok, aura = pcall(C_UnitAuras.GetPlayerAuraBySpellID, id)
+    if not ok then
+      out("aura", "bySpellID " .. id, "ERR " .. tostring(aura))
+    elseif aura then
+      out("aura", "bySpellID " .. id, "name=" .. fmt(aura.name), "stacks=" .. fmt(aura.applications),
+        "instance=" .. fmt(aura.auraInstanceID))
+    end
+  end
+
+  -- 2. Display count for instance IDs learned out of combat.
+  for name, instance in pairs(knownInstances) do
+    local ok, count = pcall(C_UnitAuras.GetAuraApplicationDisplayCount, "player", instance, 1, 99)
+    out("aura", "displayCount " .. name, ok and fmt(count) or ("ERR " .. tostring(count)))
+    local okData, data = pcall(C_UnitAuras.GetAuraDataByAuraInstanceID, "player", instance)
+    out("aura", "byInstance " .. name, okData and data and ("stacks=" .. fmt(data.applications)
+      .. " spellId=" .. fmt(data.spellId)) or (okData and "gone" or ("ERR " .. tostring(data))))
+  end
+
+  -- 3. The pass-through strip.
+  out("aura", "strip", updateAuraStrip())
+
+  -- 4. Proc glow on Lightning Bolt (Maelstrom Weapon at 5 stacks?).
+  if C_SpellActivationOverlay then
+    for _, id in ipairs(LIGHTNING_BOLT_IDS) do
+      local ok, glowing = pcall(C_SpellActivationOverlay.IsSpellOverlayed, id)
+      if not ok or glowing then out("aura", "overlayed " .. id, ok and fmt(glowing) or "ERR") end
+    end
+  end
+  endRun()
+end
+
+local function onUnitAura(updateInfo)
+  updateAuraStrip()
+  if not inCombat() or auraLogBudget <= 0 or not updateInfo then return end
+  for _, aura in ipairs(updateInfo.addedAuras or {}) do
+    if auraLogBudget <= 0 then break end
+    auraLogBudget = auraLogBudget - 1
+    out("aura", "added in combat", "name=" .. fmt(aura.name), "spellId=" .. fmt(aura.spellId),
+      "stacks=" .. fmt(aura.applications), "instance=" .. fmt(aura.auraInstanceID))
+  end
+  for _, id in ipairs(updateInfo.updatedAuraInstanceIDs or {}) do
+    if auraLogBudget <= 0 then break end
+    auraLogBudget = auraLogBudget - 1
+    local ok, count = pcall(C_UnitAuras.GetAuraApplicationDisplayCount, "player", id, 1, 99)
+    out("aura", "updated in combat", "instance=" .. fmt(id), "count=" .. (ok and fmt(count) or "ERR"))
+  end
+end
+
 local frame = CreateFrame("Frame")
 
 local EVENTS = {
@@ -458,6 +597,8 @@ local EVENTS = {
   "PLAYER_TOTEM_UPDATE", "SPELLS_CHANGED", "LEARNED_SPELL_IN_SKILL_LINE",
   "PLAYER_DEAD", "PLAYER_ALIVE", "PLAYER_UNGHOST", "UPDATE_MACROS",
   "ADDON_ACTION_BLOCKED", "ADDON_ACTION_FORBIDDEN",
+  "SPELL_ACTIVATION_OVERLAY_GLOW_SHOW", "SPELL_ACTIVATION_OVERLAY_GLOW_HIDE",
+  "SPELL_ACTIVATION_OVERLAY_SHOW", "SPELL_ACTIVATION_OVERLAY_HIDE",
 }
 
 local eventSupport = {}
@@ -466,6 +607,7 @@ for _, event in ipairs(EVENTS) do
 end
 eventSupport.UNIT_SPELLCAST_SUCCEEDED =
   pcall(frame.RegisterUnitEvent, frame, "UNIT_SPELLCAST_SUCCEEDED", "player")
+eventSupport.UNIT_AURA = pcall(frame.RegisterUnitEvent, frame, "UNIT_AURA", "player")
 
 local function reportEventSupport()
   for event, ok in pairs(eventSupport) do
@@ -485,6 +627,7 @@ frame:SetScript("OnEvent", function(_, event, ...)
     ShamanTrackerProbeDB = ShamanTrackerProbeDB or {}
     createCastButton()
     createDisplayIcons()
+    createAuraStrip()
   elseif event == "PLAYER_LOGIN" then
     beginRun("events")
     reportEventSupport()
@@ -492,12 +635,24 @@ frame:SetScript("OnEvent", function(_, event, ...)
     out("run", "help", "type /stp for commands")
   elseif event == "PLAYER_REGEN_DISABLED" then
     out("combat", "entered")
+    auraLogBudget = AURA_LOG_BUDGET
     C_Timer.After(1, function()
       if macroTestArmed then runMacroCombatEdit() end
       runCombatReads("in combat")
     end)
+    -- Late enough to have built Maelstrom Weapon stacks.
+    C_Timer.After(8, function()
+      if inCombat() then checkAuras("in combat, 8s") end
+    end)
   elseif event == "PLAYER_REGEN_ENABLED" then
     out("combat", "left")
+    C_Timer.After(1, function() checkAuras("just after combat") end)
+  elseif event == "UNIT_AURA" then
+    local _, updateInfo = ...
+    try("aura", "unitAura", onUnitAura, updateInfo)
+  elseif event:find("^SPELL_ACTIVATION_OVERLAY") then
+    local spellID = ...
+    out("overlay", event, getSpellName(spellID), "spellID=" .. fmt(spellID), "inCombat=" .. fmt(inCombat()))
   elseif event == "PLAYER_TOTEM_UPDATE" then
     -- Placing each totem once reveals which slot (Element) it uses.
     local slot = ...
@@ -531,6 +686,7 @@ local HELP = {
   "/stp cleanup - delete the test macro",
   "/stp note <text> - record what you see, e.g. /stp note slot2 icon yes swipe yes number no",
   "/stp copy - open a window with everything recorded, to copy out",
+  "/stp auras - check Lightning Shield and Maelstrom Weapon now",
   "/stp clear - forget all saved runs",
 }
 
@@ -547,6 +703,8 @@ SlashCmdList.SHAMANTRACKERPROBE = function(msg)
     armMacroTest()
   elseif cmd == "cleanup" then
     cleanupMacro()
+  elseif cmd == "auras" then
+    checkAuras(inCombat() and "manual (in combat)" or "manual (out of combat)")
   elseif cmd == "copy" then
     showCopyFrame()
   elseif cmd == "note" and rest ~= "" then
