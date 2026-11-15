@@ -8,11 +8,15 @@ A World of Warcraft: Forever addon that helps a Shaman, of any spec, keep their 
 
 **Feature**:
 One self-contained part of the addon that can be switched on or off on its own, and has its own settings and its own on-screen position and size. v1 has two: the Imbue Reminder and the Totem Bar.
-_Avoid_: Module, plugin, tracker
+_Avoid_: Module, plugin
 
 **Imbue Reminder**:
 The Feature that alerts the player when the main-hand weapon's Imbue is Missing or Expiring.
 _Avoid_: Weapon enchant reminder, buff reminder
+
+**Buff Tracker**:
+A Feature that shows one of the player's buffs with its stack count, drawn by the game itself so that it stays current in combat. There are two: the Maelstrom Weapon Tracker, which glows at 5 stacks, and the Lightning Shield Tracker.
+_Avoid_: Aura tracker, stack counter, Shield Reminder
 
 **Totem Bar**:
 The Feature that offers one button per Element, both to place a totem and to show the totem currently placed for that Element.

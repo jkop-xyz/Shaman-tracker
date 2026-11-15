@@ -14,6 +14,7 @@ Core/FeatureFrame.lua
 Core/ImbueReminder.lua
 Core/TotemBar.lua
 Core/TotemMacros.lua
+Core/BuffTrackers.lua
 Core/Addon.lua
 
 # Real game layer and bootstrap. The only code that touches the WoW API.

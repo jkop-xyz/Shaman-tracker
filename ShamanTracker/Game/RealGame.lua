@@ -207,12 +207,18 @@ function ns.CreateRealGame()
     return totems
   end
 
+  -- Looking a spell up by name finds it only in the player's spellbook.
+  function game:IsSpellNameKnown(spellName)
+    return C_Spell.GetSpellInfo(spellName) ~= nil
+  end
+
   function game:GetSpellIcon(spellName)
     return C_Spell.GetSpellTexture(spellName)
   end
 
   -- On-screen widgets live in Game/Widgets.lua.
   function game:CreateIcon(name) return ns.Widgets.CreateIcon(name) end
+  function game:CreateBuffTracker(name, spec) return ns.Widgets.CreateBuffTracker(name, spec) end
   function game:CreateTotemBar(name) return ns.Widgets.CreateTotemBar(name) end
   function game:ShowMenu(owner, items) ns.Widgets.ShowMenu(owner, items) end
   function game:PromptText(prompt) ns.Widgets.PromptText(prompt) end

@@ -83,6 +83,8 @@ function FakeGame.new(ns, options)
     spellIcons = {},        -- [spell name] = fileID, for spells not in knownTotems
     -- What's on screen, by name:
     icons = {},
+    buffTrackers = {},      -- [name] = FakeBuffTracker
+    knownSpellNames = {},   -- [spell name] = true
     totemBars = {},
     openMenu = nil,         -- { owner, items } of the last menu shown
     -- What the player did:
@@ -142,6 +144,19 @@ function FakeTotemBar:CreateButton(elementKey, elementName)
   table.insert(self.order, elementKey)
   return button
 end
+
+-- A fake Buff Tracker: the game draws the buff itself, so the fake only
+-- records what it was asked to draw. Handing it to the game is refused in
+-- combat, like creating the real aura slot.
+local FakeBuffTracker = {}
+FakeBuffTracker.__index = FakeBuffTracker
+addFeatureFrameMethods(FakeBuffTracker)
+
+function FakeBuffTracker:Activate()
+  refuseInCombat(self, "aura slot created")
+  self.active = true
+end
+function FakeBuffTracker:SetPlaceholder(fileID) self.placeholder = fileID end
 
 -- A fake icon records what it shows, for tests to check.
 local FakeIcon = {}
@@ -301,6 +316,18 @@ function FakeGame:AnswerConfirmation(accept)
   local confirmation = assert(self.openConfirmation, "no confirmation open")
   self.openConfirmation = nil
   if accept then confirmation.onAccept() end
+end
+
+-- spec = { label, spellIDs, glowAt }
+function FakeGame:CreateBuffTracker(name, spec)
+  assert(not self.buffTrackers[name], "buff tracker created twice: " .. name)
+  local tracker = setmetatable({ game = self, name = name, spec = spec, protected = true }, FakeBuffTracker)
+  self.buffTrackers[name] = tracker
+  return tracker
+end
+
+function FakeGame:IsSpellNameKnown(spellName)
+  return self.knownSpellNames[spellName] == true
 end
 
 function FakeGame:CreateIcon(name)
