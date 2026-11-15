@@ -419,20 +419,38 @@ local function chat(message)
   print("|cff0070deShaman-tracker|r: " .. message)
 end
 
--- The action bar's proc glow, on a bar the game shows at `glowAt` stacks
--- (it runs SetShown(applications >= minApplications)). The glow starts clear
--- and is lit by its animation, which the game plays while the aura is shown
--- and which is also replayed whenever the bar appears.
+-- The action bar's proc glow, shown from `glowAt` stacks on (Musca Auras'
+-- stack gate). The game sets an invisible bar's fill to the stack count; a
+-- clipping frame runs from where stack glowAt-1 ends to the fill's right
+-- edge, so it has no width below glowAt stacks and spans the icon (plus a
+-- margin for the glow) from glowAt on. The glow inside it animates all the
+-- time: the game only moves an edge, nothing is shown, hidden or read.
+local CLIP_TEMPLATE = "DisableUntrustedLayoutScriptsTemplate"
+
 local function addStackGlow(button, icon, glowAt)
-  local bar = CreateFrame("StatusBar", nil, button)
-  bar:SetAllPoints(icon)
-  bar:SetFrameLevel(button:GetFrameLevel() + 5)
-  bar:SetStatusBarTexture(WHITE)
-  bar:SetStatusBarColor(0, 0, 0, 0)
-  local glow = bar:CreateTexture(nil, "OVERLAY")
+  local margin = math.ceil(ICON_SIZE * 0.5) + 8
+  local step = ICON_SIZE + 2 * margin
+
+  local fill = CreateFrame("StatusBar", nil, button)
+  fill:SetStatusBarTexture(WHITE)
+  fill:SetStatusBarColor(0, 0, 0, 0)
+  fill:SetSize(glowAt * step, ICON_SIZE + 2 * margin)
+  fill:SetPoint("LEFT", button, "LEFT", -margin - (glowAt - 1) * step, 0)
+
+  local clip = CreateFrame("Frame", nil, button, CLIP_TEMPLATE)
+  clip:SetPoint("TOPLEFT", fill, "TOPLEFT", (glowAt - 1) * step, 0)
+  clip:SetPoint("BOTTOMRIGHT", fill:GetStatusBarTexture(), "BOTTOMRIGHT", 0, 0)
+  clip:SetClipsChildren(true)
+  clip:SetFrameLevel(button:GetFrameLevel() + 5)
+
+  local holder = CreateFrame("Frame", nil, clip)
+  holder:SetAllPoints(icon)
+  local glow = holder:CreateTexture(nil, "OVERLAY")
   glow:SetAtlas(GLOW_ATLAS)
   glow:SetPoint("CENTER", icon, "CENTER")
   glow:SetSize(ICON_SIZE * 1.4, ICON_SIZE * 1.4)
+  -- Clear until its animation runs, so a stopped flipbook never shows as a
+  -- whole sprite sheet (Aura Ledger's pattern).
   glow:SetAlpha(0)
   local anim = glow:CreateAnimationGroup()
   anim:SetLooping("REPEAT")
@@ -449,9 +467,11 @@ local function addStackGlow(button, icon, glowAt)
   flip:SetFlipBookFrames(30)
   flip:SetFlipBookFrameWidth(0)
   flip:SetFlipBookFrameHeight(0)
-  bar:HookScript("OnShow", function() anim:Play() end)
+  anim:Play()
+  -- Restarted by the game whenever the buff (re)appears.
   pcall(button.AddAuraShownAnimation, button, anim)
-  button:SetApplicationBar(bar, { minApplications = glowAt, maxApplications = glowAt })
+
+  button:SetApplicationBar(fill, { maxApplications = glowAt })
 end
 
 local function initializeBuffButton(spec, container)
@@ -480,7 +500,12 @@ local function initializeBuffButton(spec, container)
       if not (formatter and pcall(button.SetApplicationCount, button, count, { formatter = formatter })) then
         button:SetApplicationCount(count)
       end
-      diagnose(spec.label, "button ready (swipe " .. (okCooldown and "ok" or "refused") .. ")")
+      -- Time left, filled in by the game (its default aura duration format).
+      local timeLeft = button:CreateFontString(nil, "OVERLAY", "NumberFontNormal")
+      timeLeft:SetPoint("TOP", icon, "TOP", 0, -2)
+      local okTime, whyTime = pcall(button.SetDurationText, button, timeLeft)
+      diagnose(spec.label, "button ready (swipe " .. (okCooldown and "ok" or "refused")
+        .. ", countdown " .. (okTime and "ok" or ("refused: " .. tostring(whyTime))) .. ")")
 
       if spec.glowAt then
         local okGlow, why = pcall(addStackGlow, button, icon, spec.glowAt)
